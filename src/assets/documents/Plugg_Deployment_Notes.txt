@@ -1,0 +1,25 @@
+PLUGG - DEPLOYMENT & LEGAL REVIEW NOTES
+Version dated 22 October 2026
+
+Operator facts supplied: Plugg, Atedo, Pirwoth Samuel, Pakwach, www.plugg.site, support@plugg.site.
+Document effective date is tied to FIRST PUBLICATION (not represented as already live).
+
+ACTIONS BEFORE THE PDFs ARE PUBLISHED
+1. Verify exact legal status/name of the operator (Atedo and Pirwoth Samuel) and update if registration details differ.
+2. Music copyright: confirm separately documented, written and signed music rights agreements and the applicable registration and remuneration obligations BEFORE public streaming of uploaded music. A generic website Terms checkbox alone should not be assumed sufficient.
+3. Implement system-enforced age 18+ rule for registration and review visitor-access controls.
+4. Implement user-account deletion via settings and the retention schedule; the table is PROPOSED, not verified as deployed.
+5. Confirm Neon eu-central-1 is the correct actual database region, local Pakwach backups are protected, and Cloudflare processing and cookie configuration are accurately reflected.
+6. Verify cross-border data safeguards and applicable Uganda PDPO registration duties.
+7. Confirm no analytics/ads/marketing-email or unlisted vendors are active; document changes before enabling future services.
+8. Have a qualified Ugandan lawyer review both PDFs and licensing workflow before launch.
+
+LEGAL REFERENCES FOR REVIEW
+Uganda Copyright and Neighbouring Rights Act, consolidated with the 2026 amendments: https://ulii.org/en/akn/ug/act/2006/19/eng%402026-05-22
+Uganda Data Protection and Privacy Act: https://ulii.org/en/akn/ug/act/2019/9/eng%402023-12-31
+Uganda Personal Data Protection Office: https://pdpo.go.ug/
+Cloudflare cookie reference: https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/
+
+WEBSITE PATHS (suggested)
+/legal/Plugg_Terms_and_Conditions.pdf
+/legal/Plugg_Privacy_Policy.pdf
