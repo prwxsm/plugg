@@ -455,7 +455,7 @@ function AuthPage() {
                     </a>
                     {", "}
                     <a
-                      href="/documents/Plugg_Terms_and_Conditions.pdf"
+                      href="/documents/Plugg_Copyright_Policy_and_Reporting.pdf"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"

@@ -399,7 +399,7 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
             </a>
             <span className="text-muted-foreground/30 select-none">·</span>
             <a
-              href="/documents/Plugg_Terms_and_Conditions.pdf"
+              href="/copyright"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors hover:underline underline-offset-4"

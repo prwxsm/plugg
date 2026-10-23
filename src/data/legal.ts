@@ -1,9 +1,10 @@
 export interface LegalDocument {
-  id: "terms" | "privacy" | "upload-policy" | "deployment-notes";
+  id: "terms" | "privacy" | "upload-policy" | "deployment-notes" | "copyright";
   title: string;
   subtitle: string;
   fileName: string;
   url: string;
+  webUrl?: string;
 }
 
 export const LEGAL_DOCUMENTS: Record<string, LegalDocument> = {
@@ -18,8 +19,17 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocument> = {
     id: "upload-policy",
     title: "Music Upload & Copyright Policy",
     subtitle: "Music rights, copyright ownership, content guidelines, and royalty licensing policy",
-    fileName: "Plugg_Terms_and_Conditions.pdf",
-    url: "/documents/Plugg_Terms_and_Conditions.pdf",
+    fileName: "Plugg_Copyright_Policy_and_Reporting.pdf",
+    url: "/documents/Plugg_Copyright_Policy_and_Reporting.pdf",
+    webUrl: "/copyright",
+  },
+  copyright: {
+    id: "copyright",
+    title: "Copyright Policy & Infringement Reporting",
+    subtitle: "How creative works are protected, rights obligations, and reporting suspected infringement",
+    fileName: "Plugg_Copyright_Policy_and_Reporting.pdf",
+    url: "/documents/Plugg_Copyright_Policy_and_Reporting.pdf",
+    webUrl: "/copyright",
   },
   privacy: {
     id: "privacy",
