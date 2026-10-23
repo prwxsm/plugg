@@ -305,81 +305,81 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
         </section>
       ) : null}
 
-      {/* Centered Brand, Social & Legal Info Footer (No Card) */}
-      <footer className="pt-8 sm:pt-10 pb-4 text-center flex flex-col items-center justify-center space-y-5 select-none">
+      {/* Centered Brand, Social & Legal Info Footer (No Card - Well Spaced & Balanced) */}
+      <footer className="pt-12 sm:pt-16 pb-10 text-center flex flex-col items-center justify-center space-y-8 sm:space-y-10 select-none">
         {/* Tagline & Operator */}
-        <div className="space-y-1">
-          <p className="text-sm font-semibold tracking-tight text-foreground sm:text-base">
+        <div className="space-y-1.5">
+          <p className="text-base sm:text-lg font-semibold tracking-tight text-foreground">
             Discover music. Support creators.
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Operated by Atedo · Pakwach, Uganda
           </p>
         </div>
 
         {/* Follow Plugg & Social Links */}
-        <div className="space-y-2 max-w-md mx-auto">
+        <div className="space-y-3 max-w-xl mx-auto">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
             Follow Plugg
           </p>
-          <p className="text-xs text-muted-foreground leading-relaxed px-4">
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed px-4">
             Stay connected for new releases, featured artists, and platform announcements.
           </p>
-          <div className="flex items-center justify-center gap-2 pt-1">
+          <div className="flex items-center justify-center gap-4 sm:gap-5 pt-2">
             <a
               href="https://instagram.com/pluggmusic"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow Plugg on Instagram"
-              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+              className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-white/10 transition-all duration-200 hover:scale-110 active:scale-95"
             >
-              <InstagramIcon className="w-4 h-4" />
+              <InstagramIcon className="w-5 h-5" />
             </a>
             <a
               href="https://tiktok.com/@pluggmusic"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow Plugg on TikTok"
-              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+              className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-white/10 transition-all duration-200 hover:scale-110 active:scale-95"
             >
-              <TikTokIcon className="w-4 h-4" />
+              <TikTokIcon className="w-5 h-5" />
             </a>
             <a
               href="https://facebook.com/pluggmusic"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow Plugg on Facebook"
-              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+              className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-white/10 transition-all duration-200 hover:scale-110 active:scale-95"
             >
-              <FacebookIcon className="w-4 h-4" />
+              <FacebookIcon className="w-5 h-5" />
             </a>
             <a
               href="https://youtube.com/@pluggmusic"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow Plugg on YouTube"
-              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+              className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-white/10 transition-all duration-200 hover:scale-110 active:scale-95"
             >
-              <YouTubeIcon className="w-4 h-4" />
+              <YouTubeIcon className="w-5 h-5" />
             </a>
             <a
               href="https://x.com/pluggmusic"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow Plugg on X"
-              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+              className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-white/10 transition-all duration-200 hover:scale-110 active:scale-95"
             >
-              <XIcon className="w-4 h-4" />
+              <XIcon className="w-5 h-5" />
             </a>
           </div>
         </div>
 
         {/* Legal Information */}
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        <div className="space-y-2.5">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
             Legal Information
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-5 gap-y-2 text-xs sm:text-sm text-muted-foreground">
             <a
               href="/documents/Plugg_Terms_and_Conditions.pdf"
               target="_blank"
@@ -388,7 +388,7 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
             >
               Terms & Conditions
             </a>
-            <span className="text-muted-foreground/40 select-none">·</span>
+            <span className="text-muted-foreground/30 select-none">·</span>
             <a
               href="/documents/Plugg_Privacy_Policy.pdf"
               target="_blank"
@@ -397,7 +397,7 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
             >
               Privacy Policy
             </a>
-            <span className="text-muted-foreground/40 select-none">·</span>
+            <span className="text-muted-foreground/30 select-none">·</span>
             <a
               href="/documents/Plugg_Terms_and_Conditions.pdf"
               target="_blank"
@@ -410,7 +410,7 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
         </div>
 
         {/* Copyright */}
-        <p className="text-[11px] text-muted-foreground/50">
+        <p className="text-xs text-muted-foreground/50 pt-1">
           © 2026 Plugg. All rights reserved.
         </p>
       </footer>
