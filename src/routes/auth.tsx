@@ -445,32 +445,32 @@ function AuthPage() {
                   />
                   <span className="text-xs leading-relaxed text-muted-foreground group-hover:text-foreground/90 transition-colors">
                     I agree to the{" "}
-                    <Link
-                      to="/legal/$docId"
-                      params={{ docId: "terms" }}
+                    <a
+                      href="/documents/Plugg_Terms_and_Conditions.pdf"
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                     >
                       Terms & Conditions
-                    </Link>
+                    </a>
                     {", "}
-                    <Link
-                      to="/legal/$docId"
-                      params={{ docId: "upload-policy" }}
+                    <a
+                      href="/documents/Plugg_Terms_and_Conditions.pdf"
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                     >
                       Music Upload Policy
-                    </Link>
+                    </a>
                     {", and "}
-                    <Link
-                      to="/legal/$docId"
-                      params={{ docId: "privacy" }}
+                    <a
+                      href="/documents/Plugg_Privacy_Policy.pdf"
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                     >
                       Privacy Policy
-                    </Link>
+                    </a>
                     .
                   </span>
                 </label>

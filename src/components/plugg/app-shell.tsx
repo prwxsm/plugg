@@ -201,7 +201,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = location.pathname;
   const hash = location.hash;
   const { session, currentUser, currentArtist, notifications } = usePlugg();
-  const bare = pathname.startsWith("/auth");
+  const bare = pathname.startsWith("/auth") || pathname.startsWith("/legal");
   const [collapsed, setCollapsed] = useState(false);
   const [hovering, setHovering] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
