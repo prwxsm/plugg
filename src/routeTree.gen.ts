@@ -21,6 +21,7 @@ import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as ArtistUsernameRouteImport } from './routes/artist.$username'
 import { Route as GenreSlugRouteImport } from './routes/genre.$slug'
+import { Route as LegalDocIdRouteImport } from './routes/legal.$docId'
 import { Route as PlaylistIdRouteImport } from './routes/playlist.$id'
 import { Route as ReleaseSlugRouteImport } from './routes/release.$slug'
 
@@ -84,6 +85,11 @@ const GenreSlugRoute = GenreSlugRouteImport.update({
   path: '/genre/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LegalDocIdRoute = LegalDocIdRouteImport.update({
+  id: '/legal/$docId',
+  path: '/legal/$docId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaylistIdRoute = PlaylistIdRouteImport.update({
   id: '/playlist/$id',
   path: '/playlist/$id',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/artist/$username': typeof ArtistUsernameRoute
   '/genre/$slug': typeof GenreSlugRoute
+  '/legal/$docId': typeof LegalDocIdRoute
   '/playlist/$id': typeof PlaylistIdRoute
   '/release/$slug': typeof ReleaseSlugRoute
 }
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/artist/$username': typeof ArtistUsernameRoute
   '/genre/$slug': typeof GenreSlugRoute
+  '/legal/$docId': typeof LegalDocIdRoute
   '/playlist/$id': typeof PlaylistIdRoute
   '/release/$slug': typeof ReleaseSlugRoute
 }
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/artist/$username': typeof ArtistUsernameRoute
   '/genre/$slug': typeof GenreSlugRoute
+  '/legal/$docId': typeof LegalDocIdRoute
   '/playlist/$id': typeof PlaylistIdRoute
   '/release/$slug': typeof ReleaseSlugRoute
 }
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/artist/$username'
     | '/genre/$slug'
+    | '/legal/$docId'
     | '/playlist/$id'
     | '/release/$slug'
   fileRoutesByTo: FileRoutesByTo
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/artist/$username'
     | '/genre/$slug'
+    | '/legal/$docId'
     | '/playlist/$id'
     | '/release/$slug'
   id:
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/artist/$username'
     | '/genre/$slug'
+    | '/legal/$docId'
     | '/playlist/$id'
     | '/release/$slug'
   fileRoutesById: FileRoutesById
@@ -208,6 +220,7 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   ArtistUsernameRoute: typeof ArtistUsernameRoute
   GenreSlugRoute: typeof GenreSlugRoute
+  LegalDocIdRoute: typeof LegalDocIdRoute
   PlaylistIdRoute: typeof PlaylistIdRoute
   ReleaseSlugRoute: typeof ReleaseSlugRoute
 }
@@ -298,6 +311,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GenreSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/legal/$docId': {
+      id: '/legal/$docId'
+      path: '/legal/$docId'
+      fullPath: '/legal/$docId'
+      preLoaderRoute: typeof LegalDocIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/playlist/$id': {
       id: '/playlist/$id'
       path: '/playlist/$id'
@@ -328,6 +348,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   ArtistUsernameRoute: ArtistUsernameRoute,
   GenreSlugRoute: GenreSlugRoute,
+  LegalDocIdRoute: LegalDocIdRoute,
   PlaylistIdRoute: PlaylistIdRoute,
   ReleaseSlugRoute: ReleaseSlugRoute,
 }

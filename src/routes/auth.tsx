@@ -1,6 +1,15 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { CheckCircle2, Headphones, Mic, ArrowLeft } from "lucide-react";
+import {
+  CheckCircle2,
+  Headphones,
+  Mic,
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Globe,
+  Music2,
+} from "lucide-react";
 
 import logo from "@/assets/logo.png";
 import { Button, Field, inputClass } from "@/components/plugg/primitives";
@@ -8,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { loginUser, registerUser } from "@/server-fns/auth-functions";
 import { SUPPORTED_COUNTRIES } from "@/data/locations";
 import { genres } from "@/data/genres";
-import { DocumentViewerModal } from "@/components/plugg/document-viewer-modal";
+import { CustomDropdown } from "@/components/plugg/custom-dropdown";
 
 export interface AuthSearch {
   returnTo?: string;
@@ -47,13 +56,14 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Artist-specific fields
   const [artistName, setArtistName] = useState("");
   const [country, setCountry] = useState("");
   const [primaryGenre, setPrimaryGenre] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
-  const [viewingDocId, setViewingDocId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +170,8 @@ function AuthPage() {
     setSuccessMessage(null);
     setPassword("");
     setConfirmPassword("");
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setAccountType(null);
     setMode(newMode);
   };
@@ -343,28 +355,52 @@ function AuthPage() {
           </Field>
 
           <Field label="Password">
-            <input
-              type="password"
-              className={inputClass}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                className={cn(inputClass, "pr-10")}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </Field>
 
           {mode === "signup" ? (
             <Field label="Confirm password">
-              <input
-                type="password"
-                className={inputClass}
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  className={cn(inputClass, "pr-10")}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                  title={showConfirmPassword ? "Hide password" : "Show password"}
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </Field>
           ) : null}
 
@@ -372,39 +408,29 @@ function AuthPage() {
           {mode === "signup" && accountType === "artist" ? (
             <>
               <Field label="Country" hint="Available across East Africa and select partner regions">
-                <select
-                  className={cn(inputClass, "cursor-pointer bg-surface")}
+                <CustomDropdown
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  required
-                >
-                  <option value="" disabled>
-                    Select your country
-                  </option>
-                  {SUPPORTED_COUNTRIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCountry}
+                  placeholder="Select your country"
+                  options={SUPPORTED_COUNTRIES.map((c) => ({
+                    id: c,
+                    label: c,
+                    icon: Globe,
+                  }))}
+                />
               </Field>
 
               <Field label="Primary music genre" hint="Choose the primary genre that best defines your sound">
-                <select
-                  className={cn(inputClass, "cursor-pointer bg-surface")}
+                <CustomDropdown
                   value={primaryGenre}
-                  onChange={(e) => setPrimaryGenre(e.target.value)}
-                  required
-                >
-                  <option value="" disabled>
-                    Select primary genre
-                  </option>
-                  {genres.map((g) => (
-                    <option key={g.id} value={g.name}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setPrimaryGenre}
+                  placeholder="Select primary genre"
+                  options={genres.map((g) => ({
+                    id: g.name,
+                    label: g.name,
+                    icon: Music2,
+                  }))}
+                />
               </Field>
 
               {/* Accept Terms & Music Upload Policy */}
@@ -419,38 +445,32 @@ function AuthPage() {
                   />
                   <span className="text-xs leading-relaxed text-muted-foreground group-hover:text-foreground/90 transition-colors">
                     I agree to the{" "}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setViewingDocId("terms");
-                      }}
+                    <Link
+                      to="/legal/$docId"
+                      params={{ docId: "terms" }}
+                      target="_blank"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                     >
                       Terms & Conditions
-                    </button>
+                    </Link>
                     {", "}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setViewingDocId("upload-policy");
-                      }}
+                    <Link
+                      to="/legal/$docId"
+                      params={{ docId: "upload-policy" }}
+                      target="_blank"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                     >
                       Music Upload Policy
-                    </button>
+                    </Link>
                     {", and "}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setViewingDocId("privacy");
-                      }}
+                    <Link
+                      to="/legal/$docId"
+                      params={{ docId: "privacy" }}
+                      target="_blank"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                     >
                       Privacy Policy
-                    </button>
+                    </Link>
                     .
                   </span>
                 </label>
@@ -481,11 +501,6 @@ function AuthPage() {
         </p>
       </div>
     </div>
-
-    <DocumentViewerModal
-      documentId={viewingDocId}
-      onClose={() => setViewingDocId(null)}
-    />
   </div>
   );
 }

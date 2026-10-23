@@ -10,6 +10,7 @@ import {
   Settings,
   MapPin,
   Music2,
+  Globe,
 } from "lucide-react";
 
 import {
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SUPPORTED_COUNTRIES, UGANDA_CITIES } from "@/data/locations";
 import { genres } from "@/data/genres";
+import { CustomDropdown } from "@/components/plugg/custom-dropdown";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -689,24 +691,21 @@ function ProfilePage() {
 
               {/* Country */}
               <Field label="Country" hint="Available across East Africa and partner countries">
-                <select
-                  className={cn(inputClass, "cursor-pointer bg-surface")}
+                <CustomDropdown
                   value={country}
-                  onChange={(e) => {
-                    const newCountry = e.target.value;
+                  onChange={(newCountry) => {
                     setCountry(newCountry);
                     if (newCountry !== "Uganda" && UGANDA_CITIES.includes(city as any)) {
                       setCity("");
                     }
                   }}
-                >
-                  <option value="">Select country</option>
-                  {SUPPORTED_COUNTRIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select country"
+                  options={SUPPORTED_COUNTRIES.map((c) => ({
+                    id: c,
+                    label: c,
+                    icon: Globe,
+                  }))}
+                />
               </Field>
 
               {/* City / Hometown (Ugandan towns dropdown if Uganda is selected, otherwise standard text input) */}
@@ -715,18 +714,17 @@ function ProfilePage() {
                   label="City / Hometown"
                   hint="Select your hometown or district in Uganda"
                 >
-                  <select
-                    className={cn(inputClass, "cursor-pointer bg-surface")}
+                  <CustomDropdown
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                  >
-                    <option value="">Select city or hometown</option>
-                    {UGANDA_CITIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setCity}
+                    placeholder="Select city or hometown"
+                    searchable
+                    options={UGANDA_CITIES.map((c) => ({
+                      id: c,
+                      label: c,
+                      icon: MapPin,
+                    }))}
+                  />
                 </Field>
               ) : (
                 <Field
@@ -747,22 +745,19 @@ function ProfilePage() {
                 label="Primary music genre"
                 hint="Your main musical genre and signature style"
               >
-                <select
-                  className={cn(inputClass, "cursor-pointer bg-surface")}
+                <CustomDropdown
                   value={primaryGenre}
-                  onChange={(e) => {
-                    const newPrimary = e.target.value;
+                  onChange={(newPrimary) => {
                     setPrimaryGenre(newPrimary);
                     setAdditionalGenres((prev) => prev.filter((g) => g !== newPrimary));
                   }}
-                >
-                  <option value="">Select primary genre</option>
-                  {genres.map((g) => (
-                    <option key={g.id} value={g.name}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select primary genre"
+                  options={genres.map((g) => ({
+                    id: g.name,
+                    label: g.name,
+                    icon: Music2,
+                  }))}
+                />
               </Field>
 
               {/* Additional Music Genres (up to 2 maximum, making 3 genres total with primary) */}
