@@ -17,6 +17,13 @@ import {
 import { cn } from "@/lib/utils";
 import { art } from "@/data/covers";
 import { usePlugg } from "@/state/plugg-store";
+import {
+  FacebookIcon,
+  InstagramIcon,
+  TikTokIcon,
+  YouTubeIcon,
+  XIcon,
+} from "@/components/plugg/social-icons";
 
 function Toggle({
   label,
@@ -297,6 +304,116 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
           </div>
         </section>
       ) : null}
+
+      {/* Centered Brand, Social & Legal Info Footer (No Card) */}
+      <footer className="pt-8 sm:pt-10 pb-4 text-center flex flex-col items-center justify-center space-y-5 select-none">
+        {/* Tagline & Operator */}
+        <div className="space-y-1">
+          <p className="text-sm font-semibold tracking-tight text-foreground sm:text-base">
+            Discover music. Support creators.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Operated by Atedo · Pakwach, Uganda
+          </p>
+        </div>
+
+        {/* Follow Plugg & Social Links */}
+        <div className="space-y-2 max-w-md mx-auto">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+            Follow Plugg
+          </p>
+          <p className="text-xs text-muted-foreground leading-relaxed px-4">
+            Stay connected for new releases, featured artists, and platform announcements.
+          </p>
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <a
+              href="https://instagram.com/pluggmusic"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow Plugg on Instagram"
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+            >
+              <InstagramIcon className="w-4 h-4" />
+            </a>
+            <a
+              href="https://tiktok.com/@pluggmusic"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow Plugg on TikTok"
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+            >
+              <TikTokIcon className="w-4 h-4" />
+            </a>
+            <a
+              href="https://facebook.com/pluggmusic"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow Plugg on Facebook"
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+            >
+              <FacebookIcon className="w-4 h-4" />
+            </a>
+            <a
+              href="https://youtube.com/@pluggmusic"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow Plugg on YouTube"
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+            >
+              <YouTubeIcon className="w-4 h-4" />
+            </a>
+            <a
+              href="https://x.com/pluggmusic"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow Plugg on X"
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-150 hover:scale-110 active:scale-95"
+            >
+              <XIcon className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+
+        {/* Legal Information */}
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            Legal Information
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <a
+              href="/documents/Plugg_Terms_and_Conditions.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors hover:underline underline-offset-4"
+            >
+              Terms & Conditions
+            </a>
+            <span className="text-muted-foreground/40 select-none">·</span>
+            <a
+              href="/documents/Plugg_Privacy_Policy.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors hover:underline underline-offset-4"
+            >
+              Privacy Policy
+            </a>
+            <span className="text-muted-foreground/40 select-none">·</span>
+            <a
+              href="/documents/Plugg_Terms_and_Conditions.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors hover:underline underline-offset-4"
+            >
+              Copyright Reports
+            </a>
+          </div>
+        </div>
+
+        {/* Copyright */}
+        <p className="text-[11px] text-muted-foreground/50">
+          © 2026 Plugg. All rights reserved.
+        </p>
+      </footer>
 
       {/* Delete Confirmation Popup */}
       <AlertDialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
