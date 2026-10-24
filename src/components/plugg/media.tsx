@@ -407,11 +407,14 @@ export function TrackRow({
                   <button
                     onClick={() => {
                       setMenuView("closed");
-                      if (artist)
+                      if (artist) {
+                        const el = document.getElementById("main-content");
+                        if (el) el.scrollTop = 0;
                         router.navigate({
                           to: "/artist/$username",
                           params: { username: artist.username },
                         });
+                      }
                     }}
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-elevated text-foreground"
                   >

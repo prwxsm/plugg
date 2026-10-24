@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowRight,
   BarChart3,
@@ -211,26 +211,70 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [hovering, setHovering] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
+  const router = useRouter();
+
   useEffect(() => {
     const stored = window.localStorage.getItem("plugg:sidebar");
     if (stored) setCollapsed(stored === "collapsed");
+    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
   }, []);
+
+  // Helper to reliably scroll the main container and window to the top
+  const resetScrollTop = () => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+    const mainEl = document.getElementById("main-content");
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  };
+
+  // Ensure scroll is reset to top on navigation completion via router subscription
+  useEffect(() => {
+    const unsub = router.subscribe("onResolved", () => {
+      if (!location.hash) {
+        resetScrollTop();
+      }
+    });
+    return () => unsub();
+  }, [router, location.hash]);
 
   // Restore scroll to top on page navigation or smooth-scroll to hash target
   useEffect(() => {
-    if (bare) return undefined;
     const rawHash = hash?.replace(/^#/, "");
     if (rawHash) {
       const timer = setTimeout(() => {
         const el = document.getElementById(rawHash);
         if (el) {
           el.scrollIntoView({ behavior: "smooth" });
+        } else {
+          resetScrollTop();
         }
       }, 50);
       return () => clearTimeout(timer);
     }
-    mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
-    return undefined;
+
+    // Immediately reset scroll to top
+    resetScrollTop();
+
+    // Re-apply across animation frames and ticks to override any browser / route transition reflow
+    const raf1 = requestAnimationFrame(resetScrollTop);
+    const raf2 = requestAnimationFrame(() => requestAnimationFrame(resetScrollTop));
+    const t1 = setTimeout(resetScrollTop, 40);
+    const t2 = setTimeout(resetScrollTop, 120);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [pathname, hash, bare]);
 
   const toggleSidebar = () =>
