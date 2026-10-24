@@ -18,6 +18,7 @@ import { loginUser, registerUser } from "@/server-fns/auth-functions";
 import { SUPPORTED_COUNTRIES } from "@/data/locations";
 import { genres } from "@/data/genres";
 import { CustomDropdown } from "@/components/plugg/custom-dropdown";
+import { ForgotPasswordModal } from "@/components/plugg/forgot-password-modal";
 
 export interface AuthSearch {
   returnTo?: string;
@@ -68,6 +69,7 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +109,7 @@ function AuthPage() {
 
     try {
       if (mode === "signin") {
-        const res = await loginUser({ data: { email, password } });
+        const res = await loginUser({ data: { identifier: email, password } });
         if (res.success) {
           // Redirect to returnTo if provided, otherwise role-based redirect
           if (returnTo) {
@@ -277,7 +279,7 @@ function AuthPage() {
           </h1>
           <p className="mt-2 text-center text-sm text-muted-foreground">
           {mode === "signin"
-            ? "Sign in with your email and password to access your library."
+            ? "Sign in with your email or username and password to access your library."
             : accountType === "artist"
               ? "Set up your artist profile to start publishing music."
               : "Sign up to stream, save, and discover African music."}
@@ -346,18 +348,32 @@ function AuthPage() {
             </Field>
           ) : null}
 
-          <Field label="Email address">
+          <Field label={mode === "signin" ? "Email address or username" : "Email address"}>
             <input
-              type="email"
+              type={mode === "signin" ? "text" : "email"}
               className={inputClass}
-              placeholder="you@domain.com"
+              placeholder={mode === "signin" ? "you@domain.com or username" : "you@domain.com"}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoCapitalize="none"
+              autoCorrect="off"
             />
           </Field>
 
-          <Field label="Password">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">Password</span>
+              {mode === "signin" ? (
+                <button
+                  type="button"
+                  onClick={() => setForgotPasswordOpen(true)}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors hover:underline focus:outline-none"
+                >
+                  Forgot password?
+                </button>
+              ) : null}
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -379,7 +395,7 @@ function AuthPage() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-          </Field>
+          </div>
 
           {mode === "signup" ? (
             <Field label="Confirm password">
@@ -504,6 +520,17 @@ function AuthPage() {
         </p>
       </div>
     </div>
+
+    <ForgotPasswordModal
+      open={forgotPasswordOpen}
+      onOpenChange={setForgotPasswordOpen}
+      initialEmail={email.includes("@") ? email : ""}
+      onSuccess={(resetEmail) => {
+        setEmail(resetEmail);
+        setPassword("");
+        setSuccessMessage("Password reset successfully. Please sign in with your new password.");
+      }}
+    />
   </div>
   );
 }

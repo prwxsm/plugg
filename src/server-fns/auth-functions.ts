@@ -127,31 +127,35 @@ export const registerUser = createServerFn({ method: "POST" })
   });
 
 export const loginUser = createServerFn({ method: "POST" })
-  .validator((data: { email?: string; password?: string }) => data)
+  .validator((data: { email?: string; identifier?: string; password?: string }) => data)
   .handler(async ({ data }) => {
-    const { email, password } = data;
-    if (!email || !password) {
-      throw new Error("Email and password are required");
+    const rawIdentifier = (data.identifier || data.email || "").trim();
+    const { password } = data;
+    if (!rawIdentifier || !password) {
+      throw new Error("Email or username and password are required");
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalized = rawIdentifier.toLowerCase();
 
     const [user] = await sql<
       { id: string; name: string; email: string; passwordHash: string | null; accountType: "listener" | "artist"; artistId: string | null }[]
     >`
-      SELECT id, name, email, password_hash, account_type, artist_id
-      FROM users
-      WHERE lower(email) = ${normalizedEmail}
+      SELECT u.id, u.name, u.email, u.password_hash, u.account_type, u.artist_id
+      FROM users u
+      LEFT JOIN artists a ON a.id = u.artist_id
+      WHERE lower(u.email) = ${normalized}
+         OR lower(u.username) = ${normalized}
+         OR lower(a.username) = ${normalized}
       LIMIT 1
     `;
 
     if (!user || !user.passwordHash) {
-      throw new Error("Invalid email or password");
+      throw new Error("Invalid email, username, or password");
     }
 
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
-      throw new Error("Invalid email or password");
+      throw new Error("Invalid email, username, or password");
     }
 
     await createSession(user.id);
@@ -162,6 +166,99 @@ export const loginUser = createServerFn({ method: "POST" })
       role: user.accountType,
       artistId: user.artistId,
     };
+  });
+
+export const requestPasswordResetCodeFn = createServerFn({ method: "POST" })
+  .validator((data: { email: string }) => data)
+  .handler(async ({ data }) => {
+    const cleanEmail = (data.email || "").trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      throw new Error("Please enter a valid email address");
+    }
+
+    const [user] = await sql<{ id: string }[]>`
+      SELECT id FROM users WHERE lower(email) = ${cleanEmail} LIMIT 1
+    `;
+
+    if (!user) {
+      throw new Error("No account found with this email address");
+    }
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        code TEXT NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+      );
+    `;
+
+    await sql`DELETE FROM password_resets WHERE lower(email) = ${cleanEmail}`;
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await sql`
+      INSERT INTO password_resets (id, email, code, expires_at)
+      VALUES (${crypto.randomUUID()}, ${cleanEmail}, ${code}, ${expiresAt})
+    `;
+
+    return {
+      success: true,
+      email: cleanEmail,
+      code,
+    };
+  });
+
+export const resetPasswordWithCodeFn = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      email: string;
+      code: string;
+      newPassword: string;
+      confirmPassword: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const cleanEmail = (data.email || "").trim().toLowerCase();
+    const cleanCode = (data.code || "").trim();
+    const { newPassword, confirmPassword } = data;
+
+    if (!cleanEmail || !cleanCode || !newPassword || !confirmPassword) {
+      throw new Error("All fields are required");
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new Error("Passwords do not match");
+    }
+
+    if (newPassword.length < 6) {
+      throw new Error("Password must be at least 6 characters long");
+    }
+
+    const [record] = await sql<{ id: string }[]>`
+      SELECT id FROM password_resets
+      WHERE lower(email) = ${cleanEmail} AND code = ${cleanCode} AND expires_at > now()
+      LIMIT 1
+    `;
+
+    if (!record) {
+      throw new Error("Invalid or expired verification code. Please request a new code.");
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await sql`
+      UPDATE users
+      SET password_hash = ${hashedPassword}, updated_at = now()
+      WHERE lower(email) = ${cleanEmail}
+    `;
+
+    await sql`DELETE FROM password_resets WHERE lower(email) = ${cleanEmail}`;
+
+    return { success: true };
   });
 
 export const logoutUser = createServerFn({ method: "POST" }).handler(async () => {
