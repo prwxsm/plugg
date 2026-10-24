@@ -9,6 +9,8 @@ import c8 from "@/assets/cover-8.jpg";
 import b1 from "@/assets/banner-1.jpg";
 import b2 from "@/assets/banner-2.jpg";
 
+import logo from "@/assets/logo.png";
+
 import genreAfrobeats from "@/assets/01_afrobeats.png";
 import genreDancehall from "@/assets/02_dancehall.png";
 import genreDj from "@/assets/03_dj.png";
@@ -31,6 +33,9 @@ export const artwork: Record<string, string> = {
   c8,
   b1,
   b2,
+  logo,
+  default_playlist: logo,
+  plugg_logo: logo,
   genre_afrobeats: genreAfrobeats,
   genre_dancehall: genreDancehall,
   genre_dj: genreDj,
@@ -46,8 +51,16 @@ export const artwork: Record<string, string> = {
   rnb: genreRnb,
 };
 
-export function art(key: string): string {
+export function isDefaultPlaylistCover(key?: string): boolean {
+  if (!key) return true;
+  return key === "default_playlist" || key === "logo" || key === "plugg_logo";
+}
+
+export function art(key?: string): string {
   if (!key) return c1;
+  if (key === "default_playlist" || key === "logo" || key === "plugg_logo") {
+    return logo;
+  }
   if (
     key.startsWith("http://") ||
     key.startsWith("https://") ||

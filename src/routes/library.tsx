@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 
 import { ArtistCard, Rail, TrackRow } from "@/components/plugg/media";
 import { Button, EmptyState, SectionHeader, inputClass } from "@/components/plugg/primitives";
-import { art } from "@/data/covers";
+import { art, isDefaultPlaylistCover } from "@/data/covers";
 import { usePlugg } from "@/state/plugg-store";
 
 export const Route = createFileRoute("/library")({
@@ -128,11 +128,23 @@ function LibraryPage() {
                     params={{ id: p.id }}
                     className="flex min-w-0 flex-1 items-center gap-4"
                   >
-                    <img
-                      src={art(p.coverUrl)}
-                      alt=""
-                      className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                    />
+                    <div
+                      className={`h-16 w-16 shrink-0 rounded-lg overflow-hidden flex items-center justify-center ${
+                        isDefaultPlaylistCover(p.coverUrl)
+                          ? "bg-elevated/80 border border-border/40 p-2.5"
+                          : "bg-elevated"
+                      }`}
+                    >
+                      <img
+                        src={art(p.coverUrl || "default_playlist")}
+                        alt=""
+                        className={`h-full w-full ${
+                          isDefaultPlaylistCover(p.coverUrl)
+                            ? "object-contain"
+                            : "object-cover"
+                        }`}
+                      />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-foreground">{p.name}</p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">

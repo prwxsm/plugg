@@ -479,7 +479,7 @@ export const createPlaylistFn = createServerFn({ method: "POST" })
 
     const { name, description, coverUrl } = data;
     const playlistId = data.id || crypto.randomUUID();
-    const finalCover = coverUrl || "c6";
+    const finalCover = coverUrl || "default_playlist";
 
     await sql`
       INSERT INTO playlists (id, user_id, name, description, cover_url, is_mock)
@@ -514,7 +514,7 @@ export const addTrackToPlaylistFn = createServerFn({ method: "POST" })
     if (!existingPlaylist) {
       await sql`
         INSERT INTO playlists (id, user_id, name, description, cover_url, is_mock)
-        VALUES (${playlistId}, ${user.id}, 'New Playlist', '', 'c6', false)
+        VALUES (${playlistId}, ${user.id}, 'New Playlist', '', 'default_playlist', false)
         ON CONFLICT (id) DO NOTHING
       `;
     }

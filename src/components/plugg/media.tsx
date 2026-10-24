@@ -259,11 +259,15 @@ export function TrackRow({
   const isCurrent = currentTrack?.id === track.id;
   const artist = artists.find((a) => a.id === track.artistId);
   const liked = isLiked(track.id);
-  const [menuView, setMenuView] = useState<"closed" | "main" | "playlists">("closed");
+  const [menuView, setMenuView] = useState<"closed" | "main" | "playlists" | "new-playlist">("closed");
+  const [newPlaylistName, setNewPlaylistName] = useState("");
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
   useEffect(() => {
-    if (menuView === "closed") return;
+    if (menuView === "closed") {
+      setNewPlaylistName("");
+      return;
+    }
     const close = () => setMenuView("closed");
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
@@ -502,11 +506,8 @@ export function TrackRow({
                   {session !== "loggedOut" && (
                     <button
                       onClick={() => {
-                        const playlist = createPlaylist(`${track.title} mix`);
-                        if (playlist) {
-                          addTrackToPlaylist(playlist.id, track.id);
-                        }
-                        setMenuView("closed");
+                        setNewPlaylistName("");
+                        setMenuView("new-playlist");
                       }}
                       className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary hover:bg-elevated"
                     >
@@ -514,6 +515,64 @@ export function TrackRow({
                     </button>
                   )}
                 </>
+              )}
+
+              {menuView === "new-playlist" && (
+                <div className="p-2 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setMenuView("playlists")}
+                    className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground mb-1"
+                  >
+                    <ChevronLeft size={16} /> Back
+                  </button>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const trimmed = newPlaylistName.trim();
+                      if (!trimmed) return;
+                      const playlist = createPlaylist(trimmed);
+                      if (playlist) {
+                        addTrackToPlaylist(playlist.id, track.id);
+                      }
+                      setNewPlaylistName("");
+                      setMenuView("closed");
+                    }}
+                    className="space-y-3"
+                  >
+                    <div>
+                      <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">
+                        Playlist name
+                      </label>
+                      <input
+                        autoFocus
+                        value={newPlaylistName}
+                        onChange={(e) => setNewPlaylistName(e.target.value)}
+                        placeholder="e.g. My Favorites"
+                        className="w-full border-0 border-b border-white/20 bg-transparent px-1 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-white focus:outline-none focus:ring-0 transition-colors"
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewPlaylistName("");
+                          setMenuView("playlists");
+                        }}
+                        className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-elevated transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!newPlaylistName.trim()}
+                        className="rounded-lg bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40 transition-opacity"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                </div>
               )}
             </div>
           ) : null}

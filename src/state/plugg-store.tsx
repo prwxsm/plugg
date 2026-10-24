@@ -881,9 +881,7 @@ export function PluggProvider({
           ? crypto.randomUUID()
           : `p-${Date.now()}`;
 
-      const defaultCovers = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"];
-      const finalCover =
-        coverUrl || defaultCovers[Math.floor(Math.random() * defaultCovers.length)] || "c6";
+      const finalCover = coverUrl || "default_playlist";
 
       const playlist: Playlist = {
         id: playlistId,

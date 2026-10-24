@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 
 import { PlayButton, TrackRow } from "@/components/plugg/media";
 import { Button, EmptyState, SectionHeader } from "@/components/plugg/primitives";
-import { art } from "@/data/covers";
+import { art, isDefaultPlaylistCover } from "@/data/covers";
 import { formatDuration } from "@/lib/plugg";
 import { usePlugg } from "@/state/plugg-store";
 import { useRouter } from "@tanstack/react-router";
@@ -66,16 +66,25 @@ function PlaylistPage() {
   const queueIds = items.map((t) => t.id);
   const totalSeconds = items.reduce((sum, t) => sum + t.durationSeconds, 0);
   const playingHere = !!currentTrack && queueIds.includes(currentTrack.id) && isPlaying;
-  const cover = items[0]?.coverUrl ?? playlist.coverUrl;
+  const cover = playlist.coverUrl || "default_playlist";
+  const isDefaultCover = isDefaultPlaylistCover(cover);
 
   return (
     <div className="space-y-10">
       <header className="flex flex-col gap-6 sm:flex-row sm:items-end">
-        <img
-          src={art(cover)}
-          alt=""
-          className="h-40 w-40 shrink-0 rounded-2xl object-cover shadow-2xl sm:h-52 sm:w-52"
-        />
+        <div
+          className={`h-40 w-40 shrink-0 overflow-hidden rounded-2xl shadow-2xl sm:h-52 sm:w-52 flex items-center justify-center ${
+            isDefaultCover
+              ? "bg-surface border border-border/60 p-8 sm:p-10"
+              : "bg-surface"
+          }`}
+        >
+          <img
+            src={art(cover)}
+            alt=""
+            className={`h-full w-full ${isDefaultCover ? "object-contain" : "object-cover"}`}
+          />
+        </div>
         <div className="min-w-0 space-y-3">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Playlist</p>
           <h1 className="font-display text-3xl font-bold sm:text-4xl">{playlist.name}</h1>
