@@ -1,12 +1,12 @@
 # Plugg — Copyright Policy & Infringement Reporting
-**Operator:** Atedo (Pirwoth Samuel) · Pakwach, Uganda
+**Operator:** Atedo · Pakwach, Uganda
 **Website:** https://www.plugg.site · **Contact:** support@plugg.site
 **Version:** 23 October 2026 · **Effective:** When first published
 
 Website publication draft; Ugandan legal review recommended before going live.
 
 ## 01. Purpose and operator
-Plugg is a music streaming and discovery platform operated by Atedo under the direction of Pirwoth Samuel, based in Pakwach, Uganda. This Copyright Policy explains how we protect music and creative work, what rights uploaders must hold, and how suspected infringement can be reported and addressed.
+Plugg is a music streaming and discovery platform operated by Atedo, based in Pakwach, Uganda. This Copyright Policy explains how we protect music and creative work, what rights uploaders must hold, and how suspected infringement can be reported and addressed.
 
 This policy applies to Guests, Listeners, Artists and any other person submitting a copyright complaint. It supplements the Plugg Terms & Conditions and Privacy Policy. If a provision conflicts with applicable law or a valid, separately executed licensing agreement, the law and relevant valid agreement take precedence.
 

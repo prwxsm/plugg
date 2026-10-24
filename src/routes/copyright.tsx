@@ -8,7 +8,7 @@ export const Route = createFileRoute("/copyright")({
 
 function CopyrightPolicyPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-screen h-dvh w-full overflow-y-auto overflow-x-hidden bg-background text-foreground selection:bg-primary/20">
       {/* Top Navigation */}
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
@@ -68,7 +68,7 @@ function CopyrightPolicyPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
             <div className="surface-card p-3.5 rounded-xl border border-border/60">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Operator</p>
-              <p className="text-xs font-semibold text-foreground mt-0.5">Atedo (Pirwoth Samuel)</p>
+              <p className="text-xs font-semibold text-foreground mt-0.5">Atedo</p>
               <p className="text-[11px] text-muted-foreground">Pakwach, Uganda</p>
             </div>
             <div className="surface-card p-3.5 rounded-xl border border-border/60">
@@ -112,7 +112,7 @@ function CopyrightPolicyPage() {
             </h2>
             <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed space-y-2">
               <p>
-                Plugg is a music streaming and discovery platform operated by Atedo under the direction of Pirwoth Samuel, based in Pakwach, Uganda. This Copyright Policy explains how we protect music and creative work, what rights uploaders must hold, and how suspected infringement can be reported and addressed.
+                Plugg is a music streaming and discovery platform operated by Atedo, based in Pakwach, Uganda. This Copyright Policy explains how we protect music and creative work, what rights uploaders must hold, and how suspected infringement can be reported and addressed.
               </p>
               <p>
                 This policy applies to Guests, Listeners, Artists and any other person submitting a copyright complaint. It supplements the Plugg Terms & Conditions and Privacy Policy. If a provision conflicts with applicable law or a valid, separately executed licensing agreement, the law and relevant valid agreement take precedence.

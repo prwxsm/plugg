@@ -1,11 +1,11 @@
 PLUGG - DEPLOYMENT & LEGAL REVIEW NOTES
 Version dated 22 October 2026
 
-Operator facts supplied: Plugg, Atedo, Pirwoth Samuel, Pakwach, www.plugg.site, support@plugg.site.
+Operator facts supplied: Plugg, Atedo, Pakwach, www.plugg.site, support@plugg.site.
 Document effective date is tied to FIRST PUBLICATION (not represented as already live).
 
 ACTIONS BEFORE THE PDFs ARE PUBLISHED
-1. Verify exact legal status/name of the operator (Atedo and Pirwoth Samuel) and update if registration details differ.
+1. Verify exact legal status/name of the operator (Atedo) and update if registration details differ.
 2. Music copyright: confirm separately documented, written and signed music rights agreements and the applicable registration and remuneration obligations BEFORE public streaming of uploaded music. A generic website Terms checkbox alone should not be assumed sufficient.
 3. Implement system-enforced age 18+ rule for registration and review visitor-access controls.
 4. Implement user-account deletion via settings and the retention schedule; the table is PROPOSED, not verified as deployed.
