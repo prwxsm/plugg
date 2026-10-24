@@ -145,14 +145,14 @@ export function ChangePasswordModal({
                     setError(null);
                   }}
                   placeholder="••••••••"
-                  className={cn(inputClass, "pr-10")}
+                  className={cn(inputClass, "pr-7")}
                   required
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={() => setShowOldPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
                   title={showOldPassword ? "Hide password" : "Show password"}
                   aria-label={showOldPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}
@@ -213,7 +213,7 @@ export function ChangePasswordModal({
                     setError(null);
                   }}
                   placeholder="At least 6 characters"
-                  className={cn(inputClass, "pr-10")}
+                  className={cn(inputClass, "pr-7")}
                   required
                   minLength={6}
                   autoFocus
@@ -221,7 +221,7 @@ export function ChangePasswordModal({
                 <button
                   type="button"
                   onClick={() => setShowNewPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
                   title={showNewPassword ? "Hide password" : "Show password"}
                   aria-label={showNewPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}
@@ -241,14 +241,14 @@ export function ChangePasswordModal({
                     setError(null);
                   }}
                   placeholder="Repeat new password"
-                  className={cn(inputClass, "pr-10")}
+                  className={cn(inputClass, "pr-7")}
                   required
                   minLength={6}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
                   title={showConfirmPassword ? "Hide password" : "Show password"}
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}

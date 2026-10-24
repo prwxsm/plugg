@@ -61,15 +61,15 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-foreground">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
-      {hint ? <span className="mt-1.5 block text-xs text-muted-foreground">{hint}</span> : null}
+      {hint ? <span className="mt-1.5 block text-[11px] text-muted-foreground/80">{hint}</span> : null}
     </label>
   );
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-input bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-ring focus:outline-none";
+  "w-full rounded-none border-x-0 border-t-0 border-b border-border-strong bg-transparent px-0 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 transition-colors hover:border-foreground/30 focus:border-primary focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Dropdown styled with the Plugg design system instead of the native select box. */
 export function Select({

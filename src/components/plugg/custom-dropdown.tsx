@@ -80,21 +80,19 @@ export function CustomDropdown<T extends string = string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "flex w-full items-center justify-between gap-2.5 rounded-lg border border-input bg-surface px-3.5 py-2.5 text-sm text-foreground transition-all duration-150 select-none cursor-pointer",
-          open
-            ? "border-ring ring-1 ring-ring bg-secondary/40 shadow-xs"
-            : "hover:border-border/80 hover:bg-elevated/30",
+          "flex w-full items-center justify-between gap-2.5 rounded-none border-x-0 border-t-0 border-b border-border-strong bg-transparent px-0 py-2.5 text-sm text-foreground transition-all duration-150 select-none cursor-pointer hover:border-foreground/30",
+          open && "border-primary",
           disabled && "opacity-50 cursor-not-allowed pointer-events-none"
         )}
       >
-        <div className="flex items-center gap-2.5 truncate">
+        <div className="flex items-center gap-2 truncate">
           {SelectedIcon && (
             <SelectedIcon size={15} className="text-primary shrink-0" />
           )}
           <span
             className={cn(
               "truncate font-medium text-sm",
-              selected ? "text-foreground" : "text-muted-foreground font-normal"
+              selected ? "text-foreground" : "text-muted-foreground/60 font-normal"
             )}
           >
             {selected?.label || placeholder}
@@ -118,14 +116,14 @@ export function CustomDropdown<T extends string = string>({
           {searchable && (
             <div className="p-1.5 border-b border-border/60">
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
                   ref={searchInputRef}
                   type="text"
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-md border border-input bg-elevated/50 pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+                  className="w-full rounded-none border-x-0 border-t-0 border-b border-border-strong bg-transparent pl-6 pr-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
                 />
               </div>
             </div>

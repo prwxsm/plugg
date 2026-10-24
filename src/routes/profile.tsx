@@ -427,7 +427,7 @@ function ProfilePage() {
                 hint="Lowercase letters, numbers, hyphens, underscores. 3-15 chars"
               >
                 <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-medium text-muted-foreground">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center text-sm font-medium text-muted-foreground">
                     @
                   </div>
                   <input
@@ -444,7 +444,7 @@ function ProfilePage() {
                       )
                     }
                     placeholder="amanik"
-                    className={cn(inputClass, "pl-8")}
+                    className={cn(inputClass, "pl-5")}
                   />
                 </div>
               </Field>
@@ -452,7 +452,7 @@ function ProfilePage() {
               {/* Email Address */}
               <Field label="Email address" hint="Your account email used for sign in">
                 <div className="space-y-1.5">
-                  <div className="flex h-11 w-full items-center rounded-xl border border-input bg-elevated/40 px-3.5 py-2 text-sm text-foreground/90 font-mono shadow-xs select-none">
+                  <div className="flex h-10 w-full items-center rounded-none border-x-0 border-t-0 border-b border-border-strong/60 bg-transparent px-0 py-2 text-sm text-muted-foreground font-mono select-none">
                     {currentUser.email}
                   </div>
                   <div className="space-y-1">
@@ -683,7 +683,7 @@ function ProfilePage() {
                 hint="Lowercase letters, numbers, hyphens, underscores. 3-15 chars"
               >
                 <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-medium text-muted-foreground">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center text-sm font-medium text-muted-foreground">
                     @
                   </div>
                   <input
@@ -700,7 +700,7 @@ function ProfilePage() {
                       )
                     }
                     placeholder="megobhee"
-                    className={cn(inputClass, "pl-8")}
+                    className={cn(inputClass, "pl-5")}
                     required
                   />
                 </div>
@@ -715,7 +715,7 @@ function ProfilePage() {
               {/* Email Address */}
               <Field label="Email address" hint="Your account email used for sign in">
                 <div className="space-y-1.5">
-                  <div className="flex h-11 w-full items-center rounded-xl border border-input bg-elevated/40 px-3.5 py-2 text-sm text-foreground/90 font-mono shadow-xs select-none">
+                  <div className="flex h-10 w-full items-center rounded-none border-x-0 border-t-0 border-b border-border-strong/60 bg-transparent px-0 py-2 text-sm text-muted-foreground font-mono select-none">
                     {currentUser.email}
                   </div>
                   <div className="space-y-1">
@@ -895,16 +895,16 @@ function ProfilePage() {
                 hint="Private contact for management & booking inquiries. This will NOT be shown on your profile."
               >
                 <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center text-muted-foreground">
+                    <Phone className="h-4 w-4" />
+                  </div>
                   <input
                     type="tel"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     placeholder="+254 700 000 000"
-                    className={cn(inputClass, "pl-10")}
+                    className={cn(inputClass, "pl-6")}
                   />
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                    <Phone className="h-4 w-4" />
-                  </div>
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <ShieldCheck className="h-3 w-3 text-emerald-500" />

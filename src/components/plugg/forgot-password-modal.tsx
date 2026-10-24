@@ -237,7 +237,7 @@ export function ForgotPasswordModal({
               <div className="relative">
                 <input
                   type={showNewPassword ? "text" : "password"}
-                  className={cn(inputClass, "pr-10")}
+                  className={cn(inputClass, "pr-7")}
                   placeholder="At least 6 characters"
                   value={newPassword}
                   onChange={(e) => {
@@ -250,7 +250,7 @@ export function ForgotPasswordModal({
                 <button
                   type="button"
                   onClick={() => setShowNewPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
                   title={showNewPassword ? "Hide password" : "Show password"}
                   aria-label={showNewPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}
@@ -264,7 +264,7 @@ export function ForgotPasswordModal({
               <div className="relative">
                 <input
                   type={showConfirmPassword ? "text" : "password"}
-                  className={cn(inputClass, "pr-10")}
+                  className={cn(inputClass, "pr-7")}
                   placeholder="Repeat new password"
                   value={confirmPassword}
                   onChange={(e) => {
@@ -277,7 +277,7 @@ export function ForgotPasswordModal({
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
                   title={showConfirmPassword ? "Hide password" : "Show password"}
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}

@@ -377,7 +377,7 @@ function AuthPage() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className={cn(inputClass, "pr-10")}
+                className={cn(inputClass, "pr-7")}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -387,7 +387,7 @@ function AuthPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
                 title={showPassword ? "Hide password" : "Show password"}
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 tabIndex={-1}
@@ -402,7 +402,7 @@ function AuthPage() {
               <div className="relative">
                 <input
                   type={showConfirmPassword ? "text" : "password"}
-                  className={cn(inputClass, "pr-10")}
+                  className={cn(inputClass, "pr-7")}
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -412,7 +412,7 @@ function AuthPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer focus:outline-none"
                   title={showConfirmPassword ? "Hide password" : "Show password"}
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}

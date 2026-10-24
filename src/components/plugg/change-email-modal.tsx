@@ -192,7 +192,7 @@ export function ChangeEmailModal({
                   setError(null);
                 }}
                 placeholder="123456"
-                className="h-12 w-full rounded-xl border border-input bg-elevated/40 px-4 text-center font-mono text-xl tracking-[0.4em] font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-xs"
+                className="h-12 w-full rounded-none border-x-0 border-t-0 border-b-2 border-border-strong bg-transparent px-2 text-center font-mono text-xl tracking-[0.4em] font-semibold text-foreground focus:border-primary focus:outline-none focus:ring-0"
                 required
                 autoFocus
               />
