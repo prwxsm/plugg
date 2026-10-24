@@ -604,11 +604,20 @@ export const updateArtistProfileFn = createServerFn({ method: "POST" })
     const cleanUsername = username ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") : null;
 
     if (cleanUsername) {
-      const existing = await sql<{ id: string }[]>`
-        SELECT id FROM artists WHERE username = ${cleanUsername} AND id != ${user.artistId}
+      if (cleanUsername.length < 3 || cleanUsername.length > 15) {
+        throw new Error("Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores)");
+      }
+      if (!/^[a-z0-9_-]+$/.test(cleanUsername)) {
+        throw new Error("Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_)");
+      }
+      const existingArtist = await sql<{ id: string }[]>`
+        SELECT id FROM artists WHERE lower(username) = ${cleanUsername} AND id != ${user.artistId} LIMIT 1
       `;
-      if (existing.length > 0) {
-        throw new Error("Username is already taken by another artist");
+      const existingUser = await sql<{ id: string }[]>`
+        SELECT id FROM users WHERE lower(username) = ${cleanUsername} AND id != ${user.id} LIMIT 1
+      `;
+      if (existingArtist.length > 0 || existingUser.length > 0) {
+        throw new Error("Username is already taken");
       }
     }
 

@@ -205,7 +205,7 @@ interface PluggContextValue {
   userTrackPlays: Record<string, number>;
   recordDownload: (trackId: string) => boolean;
   // artist tools
-  updateArtist: (patch: Partial<Artist>) => void;
+  updateArtist: (patch: Partial<Artist>) => Promise<Artist | void>;
   upgradeToArtist: (input: NewArtistInput) => Promise<Artist>;
   createRelease: (input: NewReleaseInput) => Promise<Release>;
   updateRelease: (releaseId: string, patch: Partial<Pick<Release, "description">>) => void;
@@ -982,12 +982,13 @@ export function PluggProvider({
       );
     },
     userTrackPlays,
-    updateArtist: (patch) => {
+    updateArtist: async (patch) => {
       if (!currentArtist) return;
-      setArtists((prev) => prev.map((a) => (a.id === currentArtist.id ? { ...a, ...patch } : a)));
-      updateArtistProfileFn({ data: patch }).catch((err) => {
-        console.warn("Could not sync artist profile update:", err);
-      });
+      const updated = await updateArtistProfileFn({ data: patch });
+      if (updated) {
+        setArtists((prev) => prev.map((a) => (a.id === currentArtist.id ? updated : a)));
+      }
+      return updated;
     },
     upgradeToArtist: async (input) => {
       try {

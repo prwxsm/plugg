@@ -304,10 +304,19 @@ export const updateUserProfileFn = createServerFn({ method: "POST" })
     }
 
     if (cleanUsername) {
-      const existing = await sql<{ id: string }[]>`
-        SELECT id FROM users WHERE lower(username) = ${cleanUsername} AND id != ${user.id}
+      if (cleanUsername.length < 3 || cleanUsername.length > 15) {
+        throw new Error("Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores)");
+      }
+      if (!/^[a-z0-9_-]+$/.test(cleanUsername)) {
+        throw new Error("Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_)");
+      }
+      const existingUser = await sql<{ id: string }[]>`
+        SELECT id FROM users WHERE lower(username) = ${cleanUsername} AND id != ${user.id} LIMIT 1
       `;
-      if (existing.length > 0) {
+      const existingArtist = await sql<{ id: string }[]>`
+        SELECT id FROM artists WHERE lower(username) = ${cleanUsername} AND id != ${user.artistId || ""} LIMIT 1
+      `;
+      if (existingUser.length > 0 || existingArtist.length > 0) {
         throw new Error("Username is already taken");
       }
     }
@@ -351,6 +360,119 @@ export const updateUserProfileFn = createServerFn({ method: "POST" })
       avatarUrl: updated.avatarUrl || "",
       artistId: updated.artistId || undefined,
     };
+  });
+
+export const verifyCurrentPasswordFn = createServerFn({ method: "POST" })
+  .validator((data: { oldPassword?: string }) => data)
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    if (!user) {
+      throw new Error("You must be signed in");
+    }
+    const { oldPassword } = data;
+    if (!oldPassword) {
+      throw new Error("Please enter your current password");
+    }
+    const [dbUser] = await sql<{ passwordHash: string | null }[]>`
+      SELECT password_hash as "passwordHash" FROM users WHERE id = ${user.id} LIMIT 1
+    `;
+    if (!dbUser || !dbUser.passwordHash) {
+      throw new Error("Account not found");
+    }
+    const isValid = await verifyPassword(oldPassword, dbUser.passwordHash);
+    if (!isValid) {
+      throw new Error("Incorrect current password");
+    }
+    return { valid: true };
+  });
+
+export const changeUserPasswordFn = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      oldPassword?: string;
+      newPassword?: string;
+      confirmPassword?: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    if (!user) {
+      throw new Error("You must be signed in to change your password");
+    }
+
+    const { oldPassword, newPassword, confirmPassword } = data;
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      throw new Error("All fields are required");
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new Error("New passwords do not match");
+    }
+
+    if (newPassword.length < 6) {
+      throw new Error("New password must be at least 6 characters long");
+    }
+
+    const [dbUser] = await sql<{ passwordHash: string | null }[]>`
+      SELECT password_hash as "passwordHash" FROM users WHERE id = ${user.id} LIMIT 1
+    `;
+
+    if (!dbUser || !dbUser.passwordHash) {
+      throw new Error("Account not found");
+    }
+
+    const isValid = await verifyPassword(oldPassword, dbUser.passwordHash);
+    if (!isValid) {
+      throw new Error("Incorrect current password");
+    }
+
+    const newHash = await hashPassword(newPassword);
+
+    await sql`
+      UPDATE users
+      SET password_hash = ${newHash}, updated_at = now()
+      WHERE id = ${user.id}
+    `;
+
+    return { success: true };
+  });
+
+export const checkUsernameAvailabilityFn = createServerFn({ method: "GET" })
+  .validator((data: { username?: string }) => data)
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    const clean = (data.username || "").trim().toLowerCase();
+
+    if (!clean) {
+      return { available: false, error: "Username cannot be empty" };
+    }
+
+    if (clean.length < 3 || clean.length > 15) {
+      return { available: false, error: "Username must be between 3 and 15 characters" };
+    }
+
+    if (!/^[a-z0-9_-]+$/.test(clean)) {
+      return {
+        available: false,
+        error: "Only lowercase letters, numbers, hyphens (-), and underscores (_) allowed",
+      };
+    }
+
+    const currentUserId = user?.id || "";
+    const currentArtistId = user?.artistId || "";
+
+    const [existingUser] = await sql<{ id: string }[]>`
+      SELECT id FROM users WHERE lower(username) = ${clean} AND id != ${currentUserId} LIMIT 1
+    `;
+    const [existingArtist] = await sql<{ id: string }[]>`
+      SELECT id FROM artists WHERE lower(username) = ${clean} AND id != ${currentArtistId} LIMIT 1
+    `;
+
+    if (existingUser || existingArtist) {
+      return { available: false, error: "This username is already taken" };
+    }
+
+    return { available: true };
   });
 
 export const deleteUserAccountFn = createServerFn({ method: "POST" })

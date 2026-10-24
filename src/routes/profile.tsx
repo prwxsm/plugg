@@ -24,6 +24,7 @@ import { ArtistMobileTabs } from "@/components/plugg/artist-mobile-tabs";
 import { SettingsPanel } from "@/components/plugg/settings-panel";
 import { ProfileImageUpload } from "@/components/plugg/profile-image-upload";
 import { ChangeEmailModal } from "@/components/plugg/change-email-modal";
+import { ChangePasswordModal } from "@/components/plugg/change-password-modal";
 import {
   SocialIconsList,
   InstagramIcon,
@@ -63,6 +64,7 @@ function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const userPlaylistsCount = playlists.filter((p) => p.userId === currentUser?.id).length;
   const followingCount = followingArtistIds.length;
@@ -172,11 +174,20 @@ function ProfilePage() {
     e.preventDefault();
     if (!currentArtist) return;
 
-    const cleanedUsername =
-      username
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, "") || currentArtist.username;
+    const cleanedUsername = username
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
+
+    if (cleanedUsername.length < 3 || cleanedUsername.length > 15) {
+      toast.error("Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores).");
+      return;
+    }
+
+    if (!/^[a-z0-9_-]+$/.test(cleanedUsername)) {
+      toast.error("Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_).");
+      return;
+    }
 
     const cleanedEmail = email.trim().toLowerCase();
     const computedLocation =
@@ -187,7 +198,7 @@ function ProfilePage() {
         await updateUser({ email: cleanedEmail });
       }
 
-      updateArtist({
+      await updateArtist({
         displayName: displayName.trim() || currentArtist.displayName,
         username: cleanedUsername,
         bio: bio.trim(),
@@ -210,8 +221,8 @@ function ProfilePage() {
       setIsEditing(false);
       toast.success("Profile details updated successfully!");
       window.setTimeout(() => setSaved(false), 3000);
-    } catch {
-      // Error is caught and toasted by updateUser
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update profile details");
     }
   };
 
@@ -220,6 +231,19 @@ function ProfilePage() {
     if (!currentUser) return;
 
     const cleanedUsername = listenerUsername.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+
+    if (cleanedUsername) {
+      if (cleanedUsername.length < 3 || cleanedUsername.length > 15) {
+        toast.error("Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores).");
+        return;
+      }
+
+      if (!/^[a-z0-9_-]+$/.test(cleanedUsername)) {
+        toast.error("Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_).");
+        return;
+      }
+    }
+
     const cleanedEmail = listenerEmail.trim().toLowerCase();
 
     try {
@@ -234,8 +258,8 @@ function ProfilePage() {
       setIsEditing(false);
       toast.success("Profile details updated successfully!");
       window.setTimeout(() => setSaved(false), 3000);
-    } catch {
-      // Error is caught and toasted by updateUser
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update profile details");
     }
   };
 
@@ -398,7 +422,10 @@ function ProfilePage() {
               </Field>
 
               {/* Username */}
-              <Field label="Username" hint="Your unique listener handle (@handle)">
+              <Field
+                label="Username"
+                hint="Lowercase letters, numbers, hyphens, underscores. 3-15 chars"
+              >
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-medium text-muted-foreground">
                     @
@@ -406,8 +433,15 @@ function ProfilePage() {
                   <input
                     type="text"
                     value={listenerUsername}
+                    minLength={3}
+                    maxLength={15}
                     onChange={(e) =>
-                      setListenerUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+                      setListenerUsername(
+                        e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9_-]/g, "")
+                          .slice(0, 15)
+                      )
                     }
                     placeholder="amanik"
                     className={cn(inputClass, "pl-8")}
@@ -421,13 +455,22 @@ function ProfilePage() {
                   <div className="flex h-11 w-full items-center rounded-xl border border-input bg-elevated/40 px-3.5 py-2 text-sm text-foreground/90 font-mono shadow-xs select-none">
                     {currentUser.email}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowEmailModal(true)}
-                    className="text-xs font-semibold text-destructive hover:underline transition-colors block text-left cursor-pointer"
-                  >
-                    Change email
-                  </button>
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailModal(true)}
+                      className="text-xs font-semibold text-destructive hover:underline transition-colors block text-left cursor-pointer"
+                    >
+                      Change email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordModal(true)}
+                      className="text-xs font-semibold text-primary hover:underline transition-colors block text-left cursor-pointer"
+                    >
+                      Reset password
+                    </button>
+                  </div>
                 </div>
               </Field>
 
@@ -635,7 +678,10 @@ function ProfilePage() {
               </Field>
 
               {/* Username */}
-              <Field label="Username" hint="Your unique handle and public profile link (@handle)">
+              <Field
+                label="Username"
+                hint="Lowercase letters, numbers, hyphens, underscores. 3-15 chars"
+              >
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-medium text-muted-foreground">
                     @
@@ -643,8 +689,15 @@ function ProfilePage() {
                   <input
                     type="text"
                     value={username}
+                    minLength={3}
+                    maxLength={15}
                     onChange={(e) =>
-                      setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+                      setUsername(
+                        e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9_-]/g, "")
+                          .slice(0, 15)
+                      )
                     }
                     placeholder="megobhee"
                     className={cn(inputClass, "pl-8")}
@@ -665,13 +718,22 @@ function ProfilePage() {
                   <div className="flex h-11 w-full items-center rounded-xl border border-input bg-elevated/40 px-3.5 py-2 text-sm text-foreground/90 font-mono shadow-xs select-none">
                     {currentUser.email}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowEmailModal(true)}
-                    className="text-xs font-semibold text-destructive hover:underline transition-colors block text-left cursor-pointer"
-                  >
-                    Change email
-                  </button>
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailModal(true)}
+                      className="text-xs font-semibold text-destructive hover:underline transition-colors block text-left cursor-pointer"
+                    >
+                      Change email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordModal(true)}
+                      className="text-xs font-semibold text-primary hover:underline transition-colors block text-left cursor-pointer"
+                    >
+                      Reset password
+                    </button>
+                  </div>
                 </div>
               </Field>
 
@@ -949,6 +1011,11 @@ function ProfilePage() {
           setEmail(newEmail);
           setListenerEmail(newEmail);
         }}
+      />
+
+      <ChangePasswordModal
+        open={showPasswordModal}
+        onOpenChange={setShowPasswordModal}
       />
     </div>
   );
