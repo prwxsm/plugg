@@ -179,7 +179,7 @@ function AuthPage() {
   // ── Sign-up: Account type selection step ──
   if (mode === "signup" && accountType === null) {
     return (
-      <div className="h-full w-full overflow-y-auto bg-background px-5">
+      <div key="auth-account-selection-view" className="h-full w-full overflow-y-auto bg-background px-5">
         <div className="flex min-h-full w-full flex-col items-center py-10 sm:py-16">
           <div className="my-auto w-full max-w-md">
             <div className="flex justify-center">
@@ -201,9 +201,10 @@ function AuthPage() {
             <div className="mt-8 grid gap-4">
               {/* Listener option */}
               <button
+                key="select-listener-card"
                 type="button"
                 onClick={() => setAccountType("listener")}
-                className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-all duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
+                className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
                   <Headphones size={22} />
@@ -219,9 +220,10 @@ function AuthPage() {
 
               {/* Artist option */}
               <button
+                key="select-artist-card"
                 type="button"
                 onClick={() => setAccountType("artist")}
-                className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-all duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
+                className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
                   <Mic size={22} />
@@ -254,7 +256,7 @@ function AuthPage() {
 
   // ── Sign-in & Sign-up forms ──
   return (
-    <div className="h-full w-full overflow-y-auto bg-background px-5">
+    <div key="auth-form-view" className="h-full w-full overflow-y-auto bg-background px-5">
       <div className="flex min-h-full w-full flex-col items-center py-10 sm:py-16">
         <div className="my-auto w-full max-w-sm">
           <div className="flex justify-center">
@@ -285,6 +287,7 @@ function AuthPage() {
         {mode === "signup" && accountType ? (
           <div className="mt-4 flex justify-center">
             <button
+              key="account-type-change-badge"
               type="button"
               onClick={resetToAccountSelection}
               className="inline-flex items-center gap-2 rounded-full bg-elevated px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
