@@ -95,9 +95,9 @@ function CopyrightPolicyPage() {
           <div>
             <span className="font-semibold text-foreground">Publication Notice: </span>
             This policy applies to Guests, Listeners, Artists, and any person submitting a copyright complaint. It supplements the{" "}
-            <a href="/documents/Plugg_Terms_and_Conditions.pdf" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Terms & Conditions</a>
+            <a href="/terms" className="text-primary hover:underline font-medium">Terms & Conditions</a>
             {" "}and{" "}
-            <a href="/documents/Plugg_Privacy_Policy.pdf" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Privacy Policy</a>.
+            <a href="/privacy" className="text-primary hover:underline font-medium">Privacy Policy</a>.
             If a provision conflicts with applicable law or a valid separately executed licensing agreement, the law and relevant agreement take precedence.
           </div>
         </div>

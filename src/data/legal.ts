@@ -14,6 +14,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocument> = {
     subtitle: "Terms of service, artist obligations, and platform usage agreement",
     fileName: "Plugg_Terms_and_Conditions.pdf",
     url: "/documents/Plugg_Terms_and_Conditions.pdf",
+    webUrl: "/terms",
   },
   "upload-policy": {
     id: "upload-policy",
@@ -37,6 +38,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocument> = {
     subtitle: "How Plugg collects, protects, and manages your personal and artist data",
     fileName: "Plugg_Privacy_Policy.pdf",
     url: "/documents/Plugg_Privacy_Policy.pdf",
+    webUrl: "/privacy",
   },
   "deployment-notes": {
     id: "deployment-notes",

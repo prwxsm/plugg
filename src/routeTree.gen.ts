@@ -16,8 +16,10 @@ import { Route as CopyrightRouteImport } from './routes/copyright'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as ArtistUsernameRouteImport } from './routes/artist.$username'
@@ -61,6 +63,11 @@ const LibraryRoute = LibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -69,6 +76,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UpdatesRoute = UpdatesRouteImport.update({
@@ -115,8 +127,10 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/library': typeof LibraryRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/updates': typeof UpdatesRoute
   '/upload': typeof UploadRoute
   '/artist/$username': typeof ArtistUsernameRoute
@@ -133,8 +147,10 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/library': typeof LibraryRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/updates': typeof UpdatesRoute
   '/upload': typeof UploadRoute
   '/artist/$username': typeof ArtistUsernameRoute
@@ -152,8 +168,10 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/library': typeof LibraryRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/updates': typeof UpdatesRoute
   '/upload': typeof UploadRoute
   '/artist/$username': typeof ArtistUsernameRoute
@@ -172,8 +190,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discover'
     | '/library'
+    | '/privacy'
     | '/profile'
     | '/settings'
+    | '/terms'
     | '/updates'
     | '/upload'
     | '/artist/$username'
@@ -190,8 +210,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discover'
     | '/library'
+    | '/privacy'
     | '/profile'
     | '/settings'
+    | '/terms'
     | '/updates'
     | '/upload'
     | '/artist/$username'
@@ -208,8 +230,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discover'
     | '/library'
+    | '/privacy'
     | '/profile'
     | '/settings'
+    | '/terms'
     | '/updates'
     | '/upload'
     | '/artist/$username'
@@ -227,8 +251,10 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DiscoverRoute: typeof DiscoverRoute
   LibraryRoute: typeof LibraryRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
   UpdatesRoute: typeof UpdatesRoute
   UploadRoute: typeof UploadRoute
   ArtistUsernameRoute: typeof ArtistUsernameRoute
@@ -289,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile': {
       id: '/profile'
       path: '/profile'
@@ -301,6 +334,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/updates': {
@@ -363,8 +403,10 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DiscoverRoute: DiscoverRoute,
   LibraryRoute: LibraryRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
   UpdatesRoute: UpdatesRoute,
   UploadRoute: UploadRoute,
   ArtistUsernameRoute: ArtistUsernameRoute,

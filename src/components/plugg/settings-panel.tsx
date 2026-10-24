@@ -381,7 +381,7 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-5 gap-y-2 text-xs sm:text-sm text-muted-foreground">
             <a
-              href="/documents/Plugg_Terms_and_Conditions.pdf"
+              href="/terms"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors hover:underline underline-offset-4"
@@ -390,7 +390,7 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
             </a>
             <span className="text-muted-foreground/30 select-none">·</span>
             <a
-              href="/documents/Plugg_Privacy_Policy.pdf"
+              href="/privacy"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors hover:underline underline-offset-4"

@@ -446,7 +446,7 @@ function AuthPage() {
                   <span className="text-xs leading-relaxed text-muted-foreground group-hover:text-foreground/90 transition-colors">
                     I agree to the{" "}
                     <a
-                      href="/documents/Plugg_Terms_and_Conditions.pdf"
+                      href="/terms"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
@@ -455,7 +455,7 @@ function AuthPage() {
                     </a>
                     {", "}
                     <a
-                      href="/documents/Plugg_Copyright_Policy_and_Reporting.pdf"
+                      href="/copyright"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
@@ -464,7 +464,7 @@ function AuthPage() {
                     </a>
                     {", and "}
                     <a
-                      href="/documents/Plugg_Privacy_Policy.pdf"
+                      href="/privacy"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
