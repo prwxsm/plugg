@@ -4,6 +4,9 @@ import { getUserFromSession } from "@/lib/auth";
 import type { Artist, Genre, Playlist, Release, Track, Analytics, User } from "@/data/types";
 import { fallbackAnalytics } from "@/data/analytics";
 import { goLiveAt } from "@/lib/plugg";
+import { tracks as seedTracks } from "@/data/tracks";
+import { artists as seedArtists } from "@/data/artists";
+import { releases as seedReleases } from "@/data/releases";
 
 export const getInitialData = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getUserFromSession();
@@ -914,5 +917,97 @@ export const upgradeToArtistFn = createServerFn({ method: "POST" })
       totalPlays: 0,
       phoneNumber: "",
       socialLinks: {},
+    };
+  });
+
+export const getTrackShareData = createServerFn({ method: "GET" })
+  .validator((d: string) => d)
+  .handler(async ({ data: trackId }) => {
+    try {
+      const dbTracks = await sql<
+        {
+          id: string;
+          artistId: string;
+          releaseId: string;
+          title: string;
+          slug: string;
+          genre: string;
+          coverUrl: string;
+          audioUrl: string | null;
+          durationSeconds: number;
+          playCount: string | number;
+          features: string | null;
+          producers: string | null;
+          lyrics: string | null;
+          artistName: string | null;
+          artistUsername: string | null;
+          artistAvatarUrl: string | null;
+          releaseTitle: string | null;
+          releaseSlug: string | null;
+        }[]
+      >`
+        SELECT t.id, t.artist_id as "artistId", t.release_id as "releaseId", t.title, t.slug,
+               t.genre, t.cover_url as "coverUrl", t.audio_url as "audioUrl", t.duration_seconds as "durationSeconds",
+               t.play_count as "playCount", t.features, t.producers, t.lyrics,
+               a.display_name as "artistName", a.username as "artistUsername", a.avatar_url as "artistAvatarUrl",
+               r.title as "releaseTitle", r.slug as "releaseSlug"
+        FROM tracks t
+        LEFT JOIN artists a ON a.id = t.artist_id
+        LEFT JOIN releases r ON r.id = t.release_id
+        WHERE t.id = ${trackId}
+        LIMIT 1
+      `;
+
+      if (dbTracks.length > 0) {
+        const row = dbTracks[0]!;
+        return {
+          id: row.id,
+          artistId: row.artistId,
+          releaseId: row.releaseId,
+          title: row.title,
+          slug: row.slug,
+          genre: row.genre || "",
+          coverUrl: row.coverUrl || "",
+          audioUrl: row.audioUrl || null,
+          durationSeconds: Number(row.durationSeconds) || 0,
+          playCount: Number(row.playCount) || 0,
+          features: row.features || undefined,
+          producers: row.producers || undefined,
+          lyrics: row.lyrics || undefined,
+          artistName: row.artistName || "Artist",
+          artistUsername: row.artistUsername || "",
+          artistAvatarUrl: row.artistAvatarUrl || "",
+          releaseTitle: row.releaseTitle || "",
+          releaseSlug: row.releaseSlug || "",
+        };
+      }
+    } catch (e) {
+      console.error("Error looking up track from database:", e);
+    }
+
+    // Fallback to seed data
+    const seedTrack = seedTracks.find((t) => t.id === trackId);
+    if (!seedTrack) return null;
+    const seedArtist = seedArtists.find((a) => a.id === seedTrack.artistId);
+    const seedRelease = seedReleases.find((r) => r.id === seedTrack.releaseId);
+    return {
+      id: seedTrack.id,
+      artistId: seedTrack.artistId,
+      releaseId: seedTrack.releaseId,
+      title: seedTrack.title,
+      slug: seedTrack.slug,
+      genre: seedTrack.genre,
+      coverUrl: seedTrack.coverUrl,
+      audioUrl: seedTrack.audioUrl,
+      durationSeconds: seedTrack.durationSeconds,
+      playCount: seedTrack.playCount,
+      features: seedTrack.features,
+      producers: seedTrack.producers,
+      lyrics: seedTrack.lyrics,
+      artistName: seedArtist?.displayName ?? "Artist",
+      artistUsername: seedArtist?.username ?? "",
+      artistAvatarUrl: seedArtist?.avatarUrl ?? "",
+      releaseTitle: seedRelease?.title ?? "",
+      releaseSlug: seedRelease?.slug ?? "",
     };
   });

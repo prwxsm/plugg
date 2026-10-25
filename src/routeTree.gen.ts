@@ -27,6 +27,7 @@ import { Route as GenreSlugRouteImport } from './routes/genre.$slug'
 import { Route as LegalDocIdRouteImport } from './routes/legal.$docId'
 import { Route as PlaylistIdRouteImport } from './routes/playlist.$id'
 import { Route as ReleaseSlugRouteImport } from './routes/release.$slug'
+import { Route as TrackIdRouteImport } from './routes/track.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -118,6 +119,11 @@ const ReleaseSlugRoute = ReleaseSlugRouteImport.update({
   path: '/release/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TrackIdRoute = TrackIdRouteImport.update({
+  id: '/track/$id',
+  path: '/track/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/legal/$docId': typeof LegalDocIdRoute
   '/playlist/$id': typeof PlaylistIdRoute
   '/release/$slug': typeof ReleaseSlugRoute
+  '/track/$id': typeof TrackIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/legal/$docId': typeof LegalDocIdRoute
   '/playlist/$id': typeof PlaylistIdRoute
   '/release/$slug': typeof ReleaseSlugRoute
+  '/track/$id': typeof TrackIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/legal/$docId': typeof LegalDocIdRoute
   '/playlist/$id': typeof PlaylistIdRoute
   '/release/$slug': typeof ReleaseSlugRoute
+  '/track/$id': typeof TrackIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/legal/$docId'
     | '/playlist/$id'
     | '/release/$slug'
+    | '/track/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/legal/$docId'
     | '/playlist/$id'
     | '/release/$slug'
+    | '/track/$id'
   id:
     | '__root__'
     | '/'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/legal/$docId'
     | '/playlist/$id'
     | '/release/$slug'
+    | '/track/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   LegalDocIdRoute: typeof LegalDocIdRoute
   PlaylistIdRoute: typeof PlaylistIdRoute
   ReleaseSlugRoute: typeof ReleaseSlugRoute
+  TrackIdRoute: typeof TrackIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -392,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReleaseSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/track/$id': {
+      id: '/track/$id'
+      path: '/track/$id'
+      fullPath: '/track/$id'
+      preLoaderRoute: typeof TrackIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -414,6 +434,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalDocIdRoute: LegalDocIdRoute,
   PlaylistIdRoute: PlaylistIdRoute,
   ReleaseSlugRoute: ReleaseSlugRoute,
+  TrackIdRoute: TrackIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
