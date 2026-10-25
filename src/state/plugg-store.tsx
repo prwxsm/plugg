@@ -229,6 +229,7 @@ interface PluggContextValue {
   currentTrack: Track | null;
   isPlaying: boolean;
   progress: number;
+  duration: number;
   volume: number;
   queue: string[];
   repeatMode: RepeatMode;
@@ -309,6 +310,7 @@ export function PluggProvider({
   const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [activeDuration, setActiveDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const [queue, setQueue] = useState<string[]>([]);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
@@ -480,6 +482,12 @@ export function PluggProvider({
   volumeRef.current = volume;
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const currentTrackIdRef = useRef(currentTrackId);
+  currentTrackIdRef.current = currentTrackId;
+  const currentTrackRef = useRef(currentTrack);
+  currentTrackRef.current = currentTrack;
+  const repeatModeRef = useRef(repeatMode);
+  repeatModeRef.current = repeatMode;
   const fadeIntervalRef = useRef<number | null>(null);
 
   // Initialize Audio element once on client
@@ -491,15 +499,41 @@ export function PluggProvider({
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+
+    const onDurationSync = () => {
+      const dur = audio.duration;
+      if (Number.isFinite(dur) && dur > 0) {
+        const rounded = Math.round(dur);
+        setActiveDuration(rounded);
+        setTracks((prev) =>
+          prev.map((t) =>
+            t.id === currentTrackIdRef.current && t.durationSeconds !== rounded
+              ? { ...t, durationSeconds: rounded }
+              : t,
+          ),
+        );
+      }
+    };
+
     const onTimeUpdate = () => {
       const current = audio.currentTime;
-      setProgress(Math.floor(current));
+      const dur = audio.duration;
+      if (Number.isFinite(dur) && dur > 0) {
+        // When within 0.25s of end, clamp progress to full duration so the line completes 100%
+        if (current >= dur - 0.25) {
+          setProgress(Math.round(dur));
+        } else {
+          setProgress(Math.floor(current));
+        }
+      } else {
+        setProgress(Math.floor(current));
+      }
 
       // Handle crossfade volume fade out at track tail
-      if (settingsRef.current.crossfade && audio.duration && !Number.isNaN(audio.duration)) {
-        const remaining = audio.duration - current;
+      if (settingsRef.current.crossfade && dur && !Number.isNaN(dur)) {
+        const remaining = dur - current;
         const fadeSec = settingsRef.current.crossfadeSeconds;
-        if (remaining <= fadeSec && remaining > 0 && audio.duration > fadeSec * 2) {
+        if (remaining <= fadeSec && remaining > 0 && dur > fadeSec * 2) {
           const factor = Math.max(0, remaining / fadeSec);
           audio.volume = Math.max(0, Math.min(1, volumeRef.current * factor));
         }
@@ -509,11 +543,17 @@ export function PluggProvider({
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onDurationSync);
+    audio.addEventListener("durationchange", onDurationSync);
+    audio.addEventListener("canplay", onDurationSync);
 
     return () => {
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onDurationSync);
+      audio.removeEventListener("durationchange", onDurationSync);
+      audio.removeEventListener("canplay", onDurationSync);
       audio.pause();
     };
   }, []);
@@ -559,6 +599,7 @@ export function PluggProvider({
       setUserTrackPlays((prev) => ({ ...prev, [trackId]: (prev[trackId] || 0) + 1 }));
 
       const target = tracks.find((t) => t.id === trackId);
+      setActiveDuration(target?.durationSeconds ?? 0);
       const audio = audioRef.current;
       if (audio && target?.audioUrl) {
         if (audio.src !== target.audioUrl) {
@@ -657,10 +698,15 @@ export function PluggProvider({
         }
 
         setIsPlaying(false);
-        setProgress(0);
+        const finalDur =
+          audioRef.current?.duration &&
+          Number.isFinite(audioRef.current.duration) &&
+          audioRef.current.duration > 0
+            ? Math.round(audioRef.current.duration)
+            : (activeDuration > 0 ? activeDuration : (currentTrackRef.current?.durationSeconds ?? 0));
+        setProgress(finalDur);
         if (audioRef.current) {
           audioRef.current.pause();
-          audioRef.current.currentTime = 0;
         }
         return;
       }
@@ -668,7 +714,7 @@ export function PluggProvider({
       if (!nextId) return;
       playTrackInternal(nextId, queue);
     },
-    [currentTrackId, queue, repeatMode, shuffle, tracks, playTrackInternal],
+    [currentTrackId, queue, repeatMode, shuffle, tracks, playTrackInternal, activeDuration],
   );
 
   const stepRef = useRef(step);
@@ -680,17 +726,25 @@ export function PluggProvider({
     if (!audio) return;
 
     const onEnded = () => {
-      if (repeatMode === "one") {
+      const finalDur =
+        audio.duration && Number.isFinite(audio.duration) && audio.duration > 0
+          ? Math.round(audio.duration)
+          : (activeDuration > 0 ? activeDuration : (currentTrackRef.current?.durationSeconds ?? progress));
+      setProgress(finalDur);
+
+      if (repeatModeRef.current === "one") {
         audio.currentTime = 0;
         audio.play().catch(() => {});
       } else {
-        stepRef.current(1);
+        setTimeout(() => {
+          stepRef.current(1);
+        }, 120);
       }
     };
 
     audio.addEventListener("ended", onEnded);
     return () => audio.removeEventListener("ended", onEnded);
-  }, [repeatMode]);
+  }, [activeDuration, progress]);
 
   const playTrack = useCallback(
     (trackId: string, queueIds?: string[]) => {
@@ -1128,6 +1182,7 @@ export function PluggProvider({
     currentTrack,
     isPlaying,
     progress,
+    duration: activeDuration > 0 ? activeDuration : (currentTrack?.durationSeconds ?? 0),
     volume,
     queue,
     repeatMode,
@@ -1141,6 +1196,11 @@ export function PluggProvider({
         audio?.pause();
         setIsPlaying(false);
       } else {
+        const effDuration = activeDuration > 0 ? activeDuration : (currentTrack?.durationSeconds ?? 0);
+        if (effDuration > 0 && progress >= effDuration) {
+          if (audio) audio.currentTime = 0;
+          setProgress(0);
+        }
         audio?.play().catch(() => {});
         setIsPlaying(true);
       }
@@ -1155,9 +1215,14 @@ export function PluggProvider({
       step(-1);
     },
     seek: (seconds) => {
-      const targetSeconds = Math.max(0, Math.min(seconds, currentTrack?.durationSeconds ?? 0));
+      const effDuration = activeDuration > 0 ? activeDuration : (currentTrack?.durationSeconds ?? 0);
+      const targetSeconds = Math.max(0, Math.min(seconds, effDuration));
       if (audioRef.current && currentTrack?.audioUrl) {
-        audioRef.current.currentTime = targetSeconds;
+        const maxAudio =
+          Number.isFinite(audioRef.current.duration) && audioRef.current.duration > 0
+            ? audioRef.current.duration
+            : targetSeconds;
+        audioRef.current.currentTime = Math.min(targetSeconds, maxAudio);
       }
       setProgress(targetSeconds);
     },

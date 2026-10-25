@@ -113,6 +113,33 @@ const releaseTypes: {
 /** Estimate: roughly 160 kbps audio, so ~20 KB per second. */
 const estimateDuration = (bytes: number) => Math.max(30, Math.round(bytes / 20000));
 
+/** Helper to extract accurate duration from audio file using browser Audio API */
+const getAudioDuration = (file: File): Promise<number> => {
+  return new Promise((resolve) => {
+    try {
+      if (typeof window === "undefined") {
+        resolve(estimateDuration(file.size));
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const audio = new Audio();
+      audio.preload = "metadata";
+      audio.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        const sec = Math.round(audio.duration);
+        resolve(Number.isFinite(sec) && sec > 0 ? sec : estimateDuration(file.size));
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(estimateDuration(file.size));
+      };
+      audio.src = url;
+    } catch {
+      resolve(estimateDuration(file.size));
+    }
+  });
+};
+
 const parseGenres = (val?: string): string[] => {
   if (!val || !val.trim()) return [];
   return val
@@ -1067,6 +1094,9 @@ function UploadPage() {
                         file: { name: file.name, size: file.size },
                         durationSeconds: estimateDuration(file.size),
                       });
+                      getAudioDuration(file).then((realSec) => {
+                        if (realSec > 0) patchSong(0, { durationSeconds: realSec });
+                      });
                     }}
                   />
                 </label>
@@ -1105,6 +1135,9 @@ function UploadPage() {
                           patchSong(0, {
                             file: { name: file.name, size: file.size },
                             durationSeconds: estimateDuration(file.size),
+                          });
+                          getAudioDuration(file).then((realSec) => {
+                            if (realSec > 0) patchSong(0, { durationSeconds: realSec });
                           });
                         }}
                       />
@@ -1273,6 +1306,9 @@ function UploadPage() {
                               file: { name: file.name, size: file.size },
                               durationSeconds: estimateDuration(file.size),
                             });
+                            getAudioDuration(file).then((realSec) => {
+                              if (realSec > 0) patchSong(i, { durationSeconds: realSec });
+                            });
                           }}
                         />
                       </label>
@@ -1311,6 +1347,9 @@ function UploadPage() {
                                 patchSong(i, {
                                   file: { name: file.name, size: file.size },
                                   durationSeconds: estimateDuration(file.size),
+                                });
+                                getAudioDuration(file).then((realSec) => {
+                                  if (realSec > 0) patchSong(i, { durationSeconds: realSec });
                                 });
                               }}
                             />

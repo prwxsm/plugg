@@ -24,15 +24,14 @@ import { PlayButton } from "./media";
 import logoImg from "@/assets/logo.png";
 
 function Scrubber({ className }: { className?: string }) {
-  const { progress, currentTrack, seek } = usePlugg();
-  const duration = currentTrack?.durationSeconds ?? 0;
-  const percent = duration > 0 ? (progress / duration) * 100 : 0;
+  const { progress, duration, seek } = usePlugg();
+  const percent = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
   return (
     <input
       type="range"
       min={0}
       max={Math.max(duration, 1)}
-      value={progress}
+      value={Math.min(progress, Math.max(duration, 1))}
       aria-label="Seek"
       onChange={(event) => seek(Number(event.target.value))}
       style={{ background: `linear-gradient(to right, var(--foreground) ${percent}%, var(--muted) ${percent}%)` }}
@@ -42,12 +41,12 @@ function Scrubber({ className }: { className?: string }) {
 }
 
 export function CompactPlayerButton() {
-  const { currentTrack, progress, setFullPlayerOpen, clearPlayer } = usePlugg();
+  const { currentTrack, progress, duration, setFullPlayerOpen, clearPlayer } = usePlugg();
   const startY = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
   if (!currentTrack) return <span className="h-14 w-14 shrink-0" aria-hidden="true" />;
 
-  const percent = currentTrack.durationSeconds > 0 ? (progress / currentTrack.durationSeconds) * 100 : 0;
+  const percent = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
   const ring = `conic-gradient(var(--foreground) ${percent}%, var(--border-strong) ${percent}%)`;
   const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     startY.current = event.clientY;
@@ -346,10 +345,10 @@ export function PlayerBar() {
 }
 
 function PlayerTime({ current = false }: { current?: boolean }) {
-  const { progress, currentTrack } = usePlugg();
+  const { progress, duration } = usePlugg();
   return (
     <span className="w-9 text-[11px] tabular-nums text-muted-foreground">
-      {formatDuration(current ? progress : currentTrack?.durationSeconds ?? 0)}
+      {formatDuration(current ? Math.min(progress, duration || 0) : duration || 0)}
     </span>
   );
 }
