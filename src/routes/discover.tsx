@@ -58,7 +58,7 @@ function Discover() {
   const visibleRisingArtists = showAllRisingArtists ? risingArtists : risingArtists.slice(0, 6);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 pt-14 md:pt-0">
       <div>
         <div className="relative mt-6">
           <SearchIcon

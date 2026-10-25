@@ -68,10 +68,10 @@ function GenrePage() {
 
   return (
     <div className="space-y-10">
-      <header className="relative overflow-hidden rounded-2xl [mask-image:radial-gradient(white,black)] [-webkit-mask-image:-webkit-radial-gradient(white,black)] [transform:translateZ(0)]">
-        <img src={art(genre.image)} alt="" className="absolute inset-0 h-full w-full rounded-2xl object-cover" />
+      <header className="relative -mx-4 overflow-hidden rounded-none sm:mx-0 sm:rounded-2xl [mask-image:radial-gradient(white,black)] [-webkit-mask-image:-webkit-radial-gradient(white,black)] [transform:translateZ(0)]">
+        <img src={art(genre.image)} alt="" className="absolute inset-0 h-full w-full rounded-none sm:rounded-2xl object-cover" />
         <span className="absolute inset-0 bg-gradient-to-r from-black from-5% via-black/75 to-black/30" />
-        <div className="relative flex flex-col gap-4 px-6 py-12 sm:px-10 sm:py-16">
+        <div className="relative flex flex-col gap-4 px-6 pt-16 pb-10 sm:px-10 sm:py-16">
           <p className="text-xs uppercase tracking-[0.18em] text-white/70">Genre</p>
           <h1 className="font-display text-3xl font-bold text-white sm:text-5xl">{genre.name}</h1>
           <p className="text-sm text-white/70">

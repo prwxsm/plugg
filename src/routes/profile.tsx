@@ -264,7 +264,7 @@ function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-7 pb-12">
+    <div className="mx-auto max-w-2xl space-y-7 pb-12 pt-14 md:pt-0">
       {currentArtist ? <ArtistMobileTabs /> : null}
 
       {/* Header section */}

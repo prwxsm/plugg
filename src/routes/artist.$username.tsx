@@ -44,9 +44,9 @@ function ArtistPage() {
   return (
     <div className="space-y-10">
       <section className="relative -mx-4 overflow-hidden sm:-mx-6 sm:rounded-2xl">
-        <img src={art(artist.coverUrl)} alt="" className="h-56 w-full object-cover sm:h-72" />
+        <img src={art(artist.coverUrl)} alt="" className="h-[360px] w-full object-cover sm:h-72" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:p-8">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 p-5 pt-14 sm:flex-row sm:items-end sm:p-8">
           <img
             src={art(artist.avatarUrl)}
             alt={artist.displayName}

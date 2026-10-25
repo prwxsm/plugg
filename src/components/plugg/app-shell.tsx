@@ -468,7 +468,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         id="main-content"
         className={cn(
           "h-full overflow-y-auto overflow-x-hidden px-4 pb-36 transition-[margin] duration-300 sm:px-6 md:ml-[var(--sidebar-w)] md:pb-[110px] xl:mr-[var(--right-sidebar-w)]",
-          pathname === "/" ? "" : "pt-16 md:pt-16",
+          pathname === "/" ? "" : "md:pt-16",
         )}
       >
         <div className="mx-auto max-w-6xl">{children}</div>

@@ -58,7 +58,7 @@ function ReleasePage() {
   const more = releases.filter((r) => r.artistId === release.artistId && r.id !== release.id && r.status === "published");
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 pt-14 md:pt-0">
       <section className="flex flex-col gap-6 sm:flex-row sm:items-end">
         <img
           src={art(release.coverUrl)}

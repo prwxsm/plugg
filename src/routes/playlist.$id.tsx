@@ -70,7 +70,7 @@ function PlaylistPage() {
   const isDefaultCover = isDefaultPlaylistCover(cover);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 pt-14 md:pt-0">
       <header className="flex flex-col gap-6 sm:flex-row sm:items-end">
         <div
           className={`h-40 w-40 shrink-0 overflow-hidden rounded-2xl shadow-2xl sm:h-52 sm:w-52 flex items-center justify-center ${

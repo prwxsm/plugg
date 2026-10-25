@@ -73,7 +73,7 @@ function LibraryPage() {
   const following = followingArtistIds.map((id) => artists.find((a) => a.id === id)).filter(Boolean) as typeof artists;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pt-14 md:pt-0">
       <div className="rail-scroll flex gap-2 overflow-x-auto mt-6">
         {tabs.map((t) => (
           <button

@@ -889,7 +889,7 @@ function UploadPage() {
   const goLive = goLiveAt(releaseDate);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="mx-auto max-w-2xl space-y-8 pt-14 md:pt-0">
       <ArtistMobileTabs />
       <div className="flex items-center justify-between gap-3 mt-4">
         {step > 0 ? (

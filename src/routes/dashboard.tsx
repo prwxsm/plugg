@@ -284,7 +284,7 @@ function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6 sm:space-y-10">
+    <div className="space-y-6 sm:space-y-10 pt-14 md:pt-0">
       <ArtistMobileTabs />
       <div className="hidden md:flex flex-wrap items-end justify-end gap-4 mt-4">
         <Link

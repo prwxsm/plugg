@@ -77,7 +77,7 @@ function UpdatesPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pt-14 md:pt-0">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
