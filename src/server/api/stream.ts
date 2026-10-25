@@ -51,6 +51,12 @@ export async function handleStreamRequest(request: Request, key: string): Promis
     const nodeStream = fs.createReadStream(filePath, { start, end: safeEnd });
     const webStream = Readable.toWeb(nodeStream);
 
+    const url = new URL(request.url);
+    const downloadName = url.searchParams.get("filename") || url.searchParams.get("download");
+    const disposition = downloadName
+      ? `attachment; filename="${downloadName.replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`
+      : "inline";
+
     return new Response(webStream as ReadableStream, {
       status: 206,
       headers: {
@@ -58,6 +64,7 @@ export async function handleStreamRequest(request: Request, key: string): Promis
         "Accept-Ranges": "bytes",
         "Content-Length": String(chunkSize),
         "Content-Type": mimeType,
+        "Content-Disposition": disposition,
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
@@ -66,12 +73,19 @@ export async function handleStreamRequest(request: Request, key: string): Promis
   const nodeStream = fs.createReadStream(filePath);
   const webStream = Readable.toWeb(nodeStream);
 
+  const url = new URL(request.url);
+  const downloadName = url.searchParams.get("filename") || url.searchParams.get("download");
+  const disposition = downloadName
+    ? `attachment; filename="${downloadName.replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`
+    : "inline";
+
   return new Response(webStream as ReadableStream, {
     status: 200,
     headers: {
       "Accept-Ranges": "bytes",
       "Content-Length": String(fileSize),
       "Content-Type": mimeType,
+      "Content-Disposition": disposition,
       "Cache-Control": "public, max-age=31536000, immutable",
     },
   });

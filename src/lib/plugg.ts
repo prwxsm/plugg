@@ -94,3 +94,20 @@ export function search(
     releases: data.releases.filter((r) => r.status === "published" && r.title.toLowerCase().includes(q)),
   };
 }
+
+/** Formats track download filename as: "Title - Artist ft Features [Plugg].ext" */
+export function buildTrackDownloadFilename(
+  title: string,
+  artistName?: string | null,
+  features?: string | null,
+  ext = "mp3"
+): string {
+  const cleanTitle = (title || "Untitled").trim();
+  const cleanArtist = (artistName || "Unknown Artist").trim();
+  const rawFeatures = (features || "")
+    .trim()
+    .replace(/^(feat\.?|ft\.?)\s+/i, "");
+  const featPart = rawFeatures ? ` ft ${rawFeatures}` : "";
+  const rawName = `${cleanTitle} - ${cleanArtist}${featPart} [Plugg].${ext}`;
+  return rawName.replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, " ").trim();
+}

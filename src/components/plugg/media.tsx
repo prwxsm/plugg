@@ -20,7 +20,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { art } from "@/data/covers";
 import type { Artist, Release, Track } from "@/data/types";
-import { formatCount, formatDuration } from "@/lib/plugg";
+import { buildTrackDownloadFilename, formatCount, formatDuration } from "@/lib/plugg";
 import { cn } from "@/lib/utils";
 import { usePlugg } from "@/state/plugg-store";
 import { VerifiedBadge } from "./primitives";
@@ -442,9 +442,16 @@ export function TrackRow({
                         return;
                       }
                       if (track.audioUrl) {
+                        const urlExt = track.audioUrl.split("?")[0].split(".").pop()?.toLowerCase();
+                        const ext = urlExt && ["mp3", "wav", "flac", "aac", "ogg", "m4a"].includes(urlExt) ? urlExt : "mp3";
+                        const fileName = buildTrackDownloadFilename(track.title, artist?.displayName, track.features, ext);
+                        
+                        const downloadUrl = new URL(track.audioUrl, window.location.origin);
+                        downloadUrl.searchParams.set("filename", fileName);
+
                         const a = document.createElement("a");
-                        a.href = track.audioUrl;
-                        a.download = `${track.title}.mp3`;
+                        a.href = downloadUrl.toString();
+                        a.download = fileName;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
