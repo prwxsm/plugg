@@ -360,6 +360,7 @@ function ProfilePage() {
                   <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground font-medium">
                     <Link
                       to="/library"
+                      search={{ tab: "playlists" }}
                       className="hover:text-foreground transition-colors hover:underline"
                     >
                       {userPlaylistsCount} {userPlaylistsCount === 1 ? "Public Playlist" : "Public Playlists"}
@@ -367,6 +368,7 @@ function ProfilePage() {
                     <span>•</span>
                     <Link
                       to="/library"
+                      search={{ tab: "following" }}
                       className="hover:text-foreground transition-colors hover:underline"
                     >
                       {followingCount} Following

@@ -7,7 +7,21 @@ import { Button, EmptyState, SectionHeader, inputClass } from "@/components/plug
 import { art, isDefaultPlaylistCover } from "@/data/covers";
 import { usePlugg } from "@/state/plugg-store";
 
+export type LibraryTab = "liked" | "playlists" | "following" | "recent";
+
+export interface LibrarySearch {
+  tab?: LibraryTab;
+}
+
 export const Route = createFileRoute("/library")({
+  validateSearch: (search: Record<string, unknown>): LibrarySearch => {
+    const raw = typeof search["tab"] === "string" ? search["tab"].toLowerCase() : undefined;
+    if (raw === "playlists" || raw === "playlist") return { tab: "playlists" };
+    if (raw === "following") return { tab: "following" };
+    if (raw === "recent" || raw === "recents") return { tab: "recent" };
+    if (raw === "liked" || raw === "liked songs" || raw === "liked-songs") return { tab: "liked" };
+    return {};
+  },
   head: () => ({
     meta: [
       { title: "Your library — Plugg" },
@@ -22,9 +36,15 @@ export const Route = createFileRoute("/library")({
   component: LibraryPage,
 });
 
-const tabs = ["Liked songs", "Playlists", "Following", "Recent"] as const;
+const tabList: { id: LibraryTab; label: string }[] = [
+  { id: "liked", label: "Liked songs" },
+  { id: "playlists", label: "Playlists" },
+  { id: "following", label: "Following" },
+  { id: "recent", label: "Recent" },
+];
 
 function LibraryPage() {
+  const { tab = "liked" } = Route.useSearch();
   const {
     tracks,
     artists,
@@ -37,7 +57,6 @@ function LibraryPage() {
     updatePlaylist,
     session,
   } = usePlugg();
-  const [tab, setTab] = useState<(typeof tabs)[number]>("Liked songs");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -75,20 +94,23 @@ function LibraryPage() {
   return (
     <div className="space-y-8 pt-14 md:pt-0">
       <div className="rail-scroll flex gap-2 overflow-x-auto mt-6">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t ? "bg-primary text-primary-foreground" : "bg-elevated text-muted-foreground hover:text-foreground"
+        {tabList.map((t) => (
+          <Link
+            key={t.id}
+            to="/library"
+            search={t.id === "liked" ? {} : { tab: t.id }}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
+              tab === t.id
+                ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                : "bg-elevated text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t}
-          </button>
+            {t.label}
+          </Link>
         ))}
       </div>
 
-      {tab === "Liked songs" ? (
+      {tab === "liked" ? (
         liked.length ? (
           <div className="track-list">
             {liked.map((t, i) => (
@@ -105,7 +127,7 @@ function LibraryPage() {
         )
       ) : null}
 
-      {tab === "Playlists" ? (
+      {tab === "playlists" ? (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <Button
@@ -393,7 +415,7 @@ function LibraryPage() {
         </div>
       ) : null}
 
-      {tab === "Following" ? (
+      {tab === "following" ? (
         following.length ? (
           <Rail>
             {following.map((a) => (
@@ -410,7 +432,7 @@ function LibraryPage() {
         )
       ) : null}
 
-      {tab === "Recent" ? (
+      {tab === "recent" ? (
         recent.length ? (
           <>
             <SectionHeader title="Recently played" />
