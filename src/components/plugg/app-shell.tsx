@@ -5,7 +5,7 @@ import {
   Bell,
   ChevronsLeft,
   ChevronsRight,
-  Compass,
+  Search,
   Headphones,
   Home,
   Library,
@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 
 const listenerNav = [
   { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/discover", label: "Discover", icon: Compass, exact: false },
+  { to: "/discover", label: "Discover", icon: Search, exact: false },
   { to: "/library", label: "Library", icon: Library, exact: false },
 ] as const;
 
@@ -39,7 +39,7 @@ const artistNav = [
 
 const mobileNav = [
   { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/discover", label: "Discover", icon: Compass, exact: false },
+  { to: "/discover", label: "Discover", icon: Search, exact: false },
   { to: "/library", label: "Library", icon: Library, exact: false },
   { to: "/profile", label: "Profile", icon: UserRound, exact: false },
 ] as const;
