@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   Headphones,
@@ -9,6 +9,7 @@ import {
   EyeOff,
   Globe,
   Music2,
+  X,
 } from "lucide-react";
 
 import logo from "@/assets/logo.png";
@@ -22,6 +23,7 @@ import { ForgotPasswordModal } from "@/components/plugg/forgot-password-modal";
 
 export interface AuthSearch {
   returnTo?: string;
+  mode?: "signin" | "signup";
 }
 
 export const Route = createFileRoute("/auth")({
@@ -38,20 +40,97 @@ export const Route = createFileRoute("/auth")({
   }),
   validateSearch: (search: Record<string, unknown>): AuthSearch => {
     const raw = search["returnTo"];
+    const modeRaw = search["mode"];
+    const result: AuthSearch = {};
     if (typeof raw === "string" && raw.trim().length > 0) {
-      return { returnTo: raw };
+      result.returnTo = raw;
     }
-    return {};
+    if (modeRaw === "signin" || modeRaw === "signup") {
+      result.mode = modeRaw;
+    }
+    return result;
   },
   component: AuthPage,
 });
 
 type AccountType = "listener" | "artist";
 
+function AuthCardWrapper({
+  children,
+  onClose,
+  maxWidth = "max-w-md",
+}: {
+  children: ReactNode;
+  onClose: () => void;
+  maxWidth?: string;
+}) {
+  return (
+    <>
+      {/* Mobile solid view: 100% full screen solid page */}
+      <div className="md:hidden h-full w-full min-h-screen overflow-y-auto bg-background px-5 py-10 flex flex-col items-center justify-center">
+        <div className="w-full max-w-sm my-auto">{children}</div>
+      </div>
+
+      {/* Desktop overlay modal view: floating card over blurred background */}
+      <div
+        className="hidden md:flex fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
+        <div
+          className={cn(
+            "relative z-10 w-full rounded-3xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 my-auto max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200",
+            maxWidth,
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Top-right close button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 sm:right-6 sm:top-6 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-elevated hover:text-foreground transition-colors"
+            title="Close (Esc)"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+
 function AuthPage() {
-  const { returnTo } = useSearch({ from: "/auth" });
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const { returnTo, mode: searchMode } = useSearch({ from: "/auth" });
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<"signin" | "signup">(searchMode === "signup" ? "signup" : "signin");
   const [accountType, setAccountType] = useState<AccountType | null>(null);
+
+  const handleClose = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      const target = returnTo && !returnTo.startsWith("/auth") ? returnTo : "/";
+      navigate({ to: target as any });
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [returnTo]);
+
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -181,86 +260,84 @@ function AuthPage() {
   // ── Sign-up: Account type selection step ──
   if (mode === "signup" && accountType === null) {
     return (
-      <div key="auth-account-selection-view" className="h-full w-full overflow-y-auto bg-background px-5">
-        <div className="flex min-h-full w-full flex-col items-center py-10 sm:py-16">
-          <div className="my-auto w-full max-w-md">
-            <div className="flex justify-center">
-              <Link
-                to="/"
-                className="inline-block transition-transform hover:scale-105 active:scale-95"
-                title="Plugg home"
-              >
-                <img src={logo} alt="Plugg" className="h-10 w-10 object-contain" />
-              </Link>
-            </div>
-            <h1 className="mt-5 text-center text-xl font-semibold">
-              How will you use Plugg?
-            </h1>
-            <p className="mt-2 text-center text-sm text-muted-foreground">
-              Select your account type to get started.
-            </p>
-
-            <div className="mt-8 grid gap-4">
-              {/* Listener option */}
-              <button
-                key="select-listener-card"
-                type="button"
-                onClick={() => setAccountType("listener")}
-                className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
-              >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
-                  <Headphones size={22} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold text-foreground">Listener</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    Stream, discover, save, and engage with music. Build your library and follow your
-                    favorite artists.
-                  </p>
-                </div>
-              </button>
-
-              {/* Artist option */}
-              <button
-                key="select-artist-card"
-                type="button"
-                onClick={() => setAccountType("artist")}
-                className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
-              >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
-                  <Mic size={22} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold text-foreground">Artist</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    Publish music, manage releases, reach listeners, and track your growth with the
-                    Artist Dashboard.
-                  </p>
-                </div>
-              </button>
-            </div>
-
-            <p className="mt-8 text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <button
-                type="button"
-                className="font-medium text-primary hover:underline"
-                onClick={() => switchMode("signin")}
-              >
-                Sign in
-              </button>
-            </p>
-          </div>
+      <AuthCardWrapper onClose={handleClose} maxWidth="max-w-md">
+        <div className="flex justify-center">
+          <Link
+            to="/"
+            className="inline-block transition-transform hover:scale-105 active:scale-95"
+            title="Plugg home"
+          >
+            <img src={logo} alt="Plugg" className="h-10 w-10 object-contain" />
+          </Link>
         </div>
-      </div>
+        <h1 className="mt-5 text-center text-xl font-semibold">
+          How will you use Plugg?
+        </h1>
+        <p className="mt-2 text-center text-sm text-muted-foreground">
+          Select your account type to get started.
+        </p>
+
+        <div className="mt-8 grid gap-4">
+          {/* Listener option */}
+          <button
+            key="select-listener-card"
+            type="button"
+            onClick={() => setAccountType("listener")}
+            className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
+              <Headphones size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold text-foreground">Listener</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Stream, discover, save, and engage with music. Build your library and follow your
+                favorite artists.
+              </p>
+            </div>
+          </button>
+
+          {/* Artist option */}
+          <button
+            key="select-artist-card"
+            type="button"
+            onClick={() => setAccountType("artist")}
+            className="group relative flex items-start gap-4 rounded-2xl border border-border/60 bg-surface p-5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/40 hover:bg-elevated/40 hover:shadow-md active:scale-[0.99]"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
+              <Mic size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold text-foreground">Artist</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Publish music, manage releases, reach listeners, and track your growth with the
+                Artist Dashboard.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <button
+            type="button"
+            className="font-medium text-primary hover:underline"
+            onClick={() => switchMode("signin")}
+          >
+            Sign in
+          </button>
+        </p>
+      </AuthCardWrapper>
     );
   }
 
   // ── Sign-in & Sign-up forms ──
   return (
-    <div key="auth-form-view" className="h-full w-full overflow-y-auto bg-background px-5">
-      <div className="flex min-h-full w-full flex-col items-center py-10 sm:py-16">
-        <div className="my-auto w-full max-w-sm">
+    <>
+      <AuthCardWrapper
+        onClose={handleClose}
+        maxWidth={mode === "signup" && accountType === "artist" ? "max-w-lg" : "max-w-md"}
+      >
           <div className="flex justify-center">
             <Link
               to="/"
@@ -518,19 +595,18 @@ function AuthPage() {
             {mode === "signin" ? "Create an account" : "Sign in"}
           </button>
         </p>
-      </div>
-    </div>
+      </AuthCardWrapper>
 
-    <ForgotPasswordModal
-      open={forgotPasswordOpen}
-      onOpenChange={setForgotPasswordOpen}
-      initialEmail={email.includes("@") ? email : ""}
-      onSuccess={(resetEmail) => {
-        setEmail(resetEmail);
-        setPassword("");
-        setSuccessMessage("Password reset successfully. Please sign in with your new password.");
-      }}
-    />
-  </div>
+      <ForgotPasswordModal
+        open={forgotPasswordOpen}
+        onOpenChange={setForgotPasswordOpen}
+        initialEmail={email.includes("@") ? email : ""}
+        onSuccess={(resetEmail) => {
+          setEmail(resetEmail);
+          setPassword("");
+          setSuccessMessage("Password reset successfully. Please sign in with your new password.");
+        }}
+      />
+    </>
   );
 }

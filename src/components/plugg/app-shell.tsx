@@ -25,6 +25,16 @@ import { formatCount } from "@/lib/plugg";
 import { usePlugg } from "@/state/plugg-store";
 import { FullPlayer, PlayerBar } from "./player";
 import { Button } from "@/components/ui/button";
+import { Home as GuestHome } from "@/routes/index";
+import { Discover as GuestDiscover } from "@/routes/discover";
+
+function GuestBackground({ returnTo }: { returnTo?: string }) {
+  if (returnTo?.startsWith("/discover")) {
+    return <GuestDiscover />;
+  }
+  return <GuestHome />;
+}
+
 
 const listenerNav = [
   { to: "/", label: "Home", icon: Home, exact: true },
@@ -201,8 +211,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = location.pathname;
   const hash = location.hash;
   const { session, currentUser, currentArtist, notifications } = usePlugg();
-  const bare =
-    pathname.startsWith("/auth") ||
+  const isAuth = pathname.startsWith("/auth");
+  const isLegalBare =
     pathname.startsWith("/legal") ||
     pathname.startsWith("/terms") ||
     pathname.startsWith("/privacy") ||
@@ -275,7 +285,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [pathname, hash, bare]);
+  }, [pathname, hash, isLegalBare]);
 
   const toggleSidebar = () =>
     setCollapsed((prev) => {
@@ -284,7 +294,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       return next;
     });
 
-  if (bare) return <>{children}</>;
+  if (isLegalBare) return <>{children}</>;
+
 
   const isArtist = session === "loggedInArtist";
   const nav = isArtist ? [...listenerNav, ...artistNav] : listenerNav;
@@ -424,6 +435,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : (
             <Link
               to="/auth"
+              search={pathname !== "/auth" ? { returnTo: pathname } : {}}
               className="flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               {collapsed ? <UserRound size={16} /> : "Sign in"}
@@ -433,7 +445,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Floating top bar */}
-      <header className="fixed left-0 right-0 top-0 z-50 flex w-full items-center justify-between px-4 py-3 pointer-events-none md:left-[var(--sidebar-w)] md:justify-end md:w-auto md:right-4 xl:right-[calc(var(--right-sidebar-w)+1rem)]">
+      <header className={cn("fixed left-0 right-0 top-0 z-50 flex w-full items-center justify-between px-4 py-3 pointer-events-none md:left-[var(--sidebar-w)] md:justify-end md:w-auto md:right-4 xl:right-[calc(var(--right-sidebar-w)+1rem)]", isAuth && "hidden md:flex")}>
         <Link
           to="/"
           className="flex items-center gap-2 font-display text-lg font-bold tracking-tight pointer-events-auto md:hidden bg-background/40 px-3 py-1.5 rounded-full backdrop-blur-md"
@@ -467,11 +479,27 @@ export function AppShell({ children }: { children: ReactNode }) {
         ref={mainRef}
         id="main-content"
         className={cn(
-          "h-full overflow-y-auto overflow-x-hidden px-4 pb-36 transition-[margin] duration-300 sm:px-6 md:ml-[var(--sidebar-w)] md:pb-[110px] xl:mr-[var(--right-sidebar-w)]",
+          "h-full overflow-y-auto overflow-x-hidden transition-[margin] duration-300",
+          isAuth
+            ? "p-0 md:px-4 md:ml-[var(--sidebar-w)] md:pb-[110px] xl:mr-[var(--right-sidebar-w)]"
+            : "px-4 pb-36 sm:px-6 md:ml-[var(--sidebar-w)] md:pb-[110px] xl:mr-[var(--right-sidebar-w)]",
           pathname === "/" ? "" : "md:pt-16",
         )}
       >
-        <div className="mx-auto max-w-6xl">{children}</div>
+        {isAuth ? (
+          <>
+            {/* Desktop blurred guest background */}
+            <div className="hidden md:block filter blur-[6px] brightness-[0.4] select-none pointer-events-none transition-all duration-300">
+              <div className="mx-auto max-w-6xl">
+                <GuestBackground returnTo={location.search?.returnTo as string | undefined} />
+              </div>
+            </div>
+            {/* Auth content: on mobile it is solid full page, on desktop it is fixed overlay modal */}
+            {children}
+          </>
+        ) : (
+          <div className="mx-auto max-w-6xl">{children}</div>
+        )}
       </main>
 
       {/* Right discovery panel (desktop xl+) */}
@@ -481,7 +509,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <FullPlayer />
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 items-center bg-surface/95 px-2 py-2 backdrop-blur-xl md:hidden">
+      <nav className={cn("fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 items-center bg-surface/95 px-2 py-2 backdrop-blur-xl md:hidden", isAuth && "hidden")}>
         {mobileNav.map((item) => {
           const profileSection =
             isArtist &&

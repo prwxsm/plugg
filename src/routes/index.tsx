@@ -26,7 +26,7 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-function Home() {
+export function Home() {
   const {
     tracks,
     releases,

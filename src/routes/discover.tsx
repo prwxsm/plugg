@@ -26,7 +26,7 @@ export const Route = createFileRoute("/discover")({
   component: Discover,
 });
 
-function Discover() {
+export function Discover() {
   const { tracks, artists, releases, genres } = usePlugg();
   const [query, setQuery] = useState("");
 

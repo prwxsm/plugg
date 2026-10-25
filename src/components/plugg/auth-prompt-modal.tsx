@@ -1,16 +1,9 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { LogIn, Music2, X } from "lucide-react";
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/plugg/primitives";
-
-interface AuthPromptState {
-  open: boolean;
-  title: string;
-  description: string;
-  returnTo?: string | undefined;
-}
 
 interface AuthPromptContextValue {
   showAuthPrompt: (opts?: { title?: string; description?: string; returnTo?: string | undefined }) => void;
@@ -20,39 +13,26 @@ interface AuthPromptContextValue {
 const AuthPromptContext = createContext<AuthPromptContextValue | null>(null);
 
 export function AuthPromptProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthPromptState>({
-    open: false,
-    title: "Sign in to continue",
-    description: "Create a free account or sign in to access this feature.",
-  });
+  const router = useRouter();
 
   const showAuthPrompt = useCallback(
     (opts?: { title?: string; description?: string; returnTo?: string | undefined }) => {
-      setState({
-        open: true,
-        title: opts?.title || "Sign in to continue",
-        description: opts?.description || "Create a free account or sign in to access this feature.",
-        returnTo: opts?.returnTo,
+      const currentUrl =
+        typeof window !== "undefined" ? window.location.pathname + window.location.search : "/";
+      const targetReturnTo = opts?.returnTo || (currentUrl !== "/auth" ? currentUrl : "/");
+      router.navigate({
+        to: "/auth",
+        search: { returnTo: targetReturnTo },
       });
     },
-    [],
+    [router],
   );
 
-  const closeAuthPrompt = useCallback(() => {
-    setState((prev) => ({ ...prev, open: false }));
-  }, []);
+  const closeAuthPrompt = useCallback(() => {}, []);
 
   return (
     <AuthPromptContext.Provider value={{ showAuthPrompt, closeAuthPrompt }}>
       {children}
-      {state.open ? (
-        <AuthPromptModal
-          title={state.title}
-          description={state.description}
-          returnTo={state.returnTo}
-          onClose={closeAuthPrompt}
-        />
-      ) : null}
     </AuthPromptContext.Provider>
   );
 }
