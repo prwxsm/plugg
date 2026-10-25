@@ -230,6 +230,7 @@ interface PluggContextValue {
   isPlaying: boolean;
   progress: number;
   duration: number;
+  getCurrentTime: () => number;
   volume: number;
   queue: string[];
   repeatMode: RepeatMode;
@@ -1183,6 +1184,12 @@ export function PluggProvider({
     isPlaying,
     progress,
     duration: activeDuration > 0 ? activeDuration : (currentTrack?.durationSeconds ?? 0),
+    getCurrentTime: () => {
+      if (audioRef.current && currentTrack?.audioUrl && Number.isFinite(audioRef.current.currentTime)) {
+        return audioRef.current.currentTime;
+      }
+      return progress;
+    },
     volume,
     queue,
     repeatMode,

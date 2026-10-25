@@ -24,30 +24,140 @@ import { PlayButton } from "./media";
 import logoImg from "@/assets/logo.png";
 
 function Scrubber({ className }: { className?: string }) {
-  const { progress, duration, seek } = usePlugg();
-  const percent = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+  const { progress, duration, seek, isPlaying, getCurrentTime } = usePlugg();
+  const fillRef = useRef<HTMLDivElement | null>(null);
+  const thumbRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const initialPercent = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+
+  // Real-time smooth flowing audio progress loop (60fps animation)
+  useEffect(() => {
+    if (!isPlaying || duration <= 0) {
+      const pct = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+      if (fillRef.current) fillRef.current.style.width = `${pct}%`;
+      if (thumbRef.current) thumbRef.current.style.left = `${pct}%`;
+      if (inputRef.current && !isDraggingRef.current) {
+        inputRef.current.value = String(Math.min(progress, duration));
+      }
+      return;
+    }
+
+    let animId: number;
+    const tick = () => {
+      if (!isDraggingRef.current) {
+        const cur = getCurrentTime();
+        const pct = duration > 0 ? Math.min(100, Math.max(0, (cur / duration) * 100)) : 0;
+        if (fillRef.current) fillRef.current.style.width = `${pct}%`;
+        if (thumbRef.current) thumbRef.current.style.left = `${pct}%`;
+        if (inputRef.current) {
+          inputRef.current.value = String(Math.min(cur, duration));
+        }
+      }
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, duration, getCurrentTime, progress]);
+
+  const isSlim = className?.includes("!h-[3px]") || className?.includes("rounded-none");
+
   return (
-    <input
-      type="range"
-      min={0}
-      max={Math.max(duration, 1)}
-      value={Math.min(progress, Math.max(duration, 1))}
-      aria-label="Seek"
-      onChange={(event) => seek(Number(event.target.value))}
-      style={{ background: `linear-gradient(to right, var(--foreground) ${percent}%, var(--muted) ${percent}%)` }}
-      className={cn("h-1 w-full cursor-pointer appearance-none rounded-full accent-primary", className)}
-    />
+    <div
+      className={cn(
+        "group/scrubber relative flex w-full items-center select-none",
+        isSlim ? "h-[3px] py-0 cursor-default" : "h-5 py-2 cursor-pointer",
+        className
+      )}
+    >
+      {/* Background track */}
+      <div
+        className={cn(
+          "relative h-1 w-full bg-muted overflow-hidden transition-[height] duration-150",
+          isSlim ? "!h-[3px] rounded-none" : "rounded-full group-hover/scrubber:h-1.5"
+        )}
+      >
+        {/* Smooth flowing progress fill */}
+        <div
+          ref={fillRef}
+          className={cn(
+            "h-full bg-foreground will-change-[width]",
+            isSlim ? "rounded-none" : "rounded-full"
+          )}
+          style={{ width: `${initialPercent}%` }}
+        />
+      </div>
+
+      {/* Thumb handle (only shown on desktop scrubber on hover/active) */}
+      {!isSlim && (
+        <div
+          ref={thumbRef}
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 rounded-full bg-foreground shadow-md opacity-0 group-hover/scrubber:opacity-100 transition-opacity duration-150"
+          style={{ left: `${initialPercent}%` }}
+        />
+      )}
+
+      {/* Native Range Input on top for accessibility, touch & keyboard control */}
+      <input
+        ref={inputRef}
+        type="range"
+        min={0}
+        max={Math.max(duration, 1)}
+        step="any"
+        defaultValue={Math.min(progress, Math.max(duration, 1))}
+        aria-label="Seek"
+        onPointerDown={() => {
+          isDraggingRef.current = true;
+        }}
+        onPointerUp={() => {
+          isDraggingRef.current = false;
+        }}
+        onChange={(event) => {
+          const val = Number(event.target.value);
+          const pct = duration > 0 ? Math.min(100, Math.max(0, (val / duration) * 100)) : 0;
+          if (fillRef.current) fillRef.current.style.width = `${pct}%`;
+          if (thumbRef.current) thumbRef.current.style.left = `${pct}%`;
+          seek(val);
+        }}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0 z-10"
+      />
+    </div>
   );
 }
 
 export function CompactPlayerButton() {
-  const { currentTrack, progress, duration, setFullPlayerOpen, clearPlayer } = usePlugg();
+  const { currentTrack, progress, duration, setFullPlayerOpen, clearPlayer, isPlaying, getCurrentTime } = usePlugg();
   const startY = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
+  const ringRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!isPlaying || duration <= 0) {
+      const pct = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+      if (ringRef.current) {
+        ringRef.current.style.background = `conic-gradient(var(--foreground) ${pct}%, var(--border-strong) ${pct}%)`;
+      }
+      return;
+    }
+    let animId: number;
+    const tick = () => {
+      const cur = getCurrentTime();
+      const pct = duration > 0 ? Math.min(100, Math.max(0, (cur / duration) * 100)) : 0;
+      if (ringRef.current) {
+        ringRef.current.style.background = `conic-gradient(var(--foreground) ${pct}%, var(--border-strong) ${pct}%)`;
+      }
+      animId = requestAnimationFrame(tick);
+    };
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, duration, getCurrentTime, progress]);
+
   if (!currentTrack) return <span className="h-14 w-14 shrink-0" aria-hidden="true" />;
 
-  const percent = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
-  const ring = `conic-gradient(var(--foreground) ${percent}%, var(--border-strong) ${percent}%)`;
+  const initialPercent = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+  const ring = `conic-gradient(var(--foreground) ${initialPercent}%, var(--border-strong) ${initialPercent}%)`;
   const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     startY.current = event.clientY;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -66,6 +176,7 @@ export function CompactPlayerButton() {
   return (
     <div className="group/player relative -mt-4 h-14 w-14 shrink-0">
       <button
+        ref={ringRef}
         type="button"
         aria-label={`Open player for ${currentTrack.title}. Swipe up to dismiss.`}
         onPointerDown={onPointerDown}
