@@ -1038,10 +1038,11 @@ export function PluggProvider({
     updateArtist: async (patch) => {
       if (!currentArtist) return;
       const updated = await updateArtistProfileFn({ data: patch });
-      if (updated) {
-        setArtists((prev) => prev.map((a) => (a.id === currentArtist.id ? updated : a)));
-      }
-      return updated;
+      const mergedArtist = updated
+        ? { ...currentArtist, ...updated, socialLinks: updated.socialLinks ?? patch.socialLinks ?? currentArtist.socialLinks }
+        : { ...currentArtist, ...patch, socialLinks: patch.socialLinks ?? currentArtist.socialLinks };
+      setArtists((prev) => prev.map((a) => (a.id === currentArtist.id ? mergedArtist : a)));
+      return mergedArtist;
     },
     upgradeToArtist: async (input) => {
       try {

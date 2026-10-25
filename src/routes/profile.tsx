@@ -30,6 +30,8 @@ import {
   InstagramIcon,
   FacebookIcon,
   TikTokIcon,
+  YouTubeIcon,
+  XIcon,
 } from "@/components/plugg/social-icons";
 import { art } from "@/data/covers";
 import { usePlugg } from "@/state/plugg-store";
@@ -80,10 +82,28 @@ function ProfilePage() {
   const [additionalGenres, setAdditionalGenres] = useState<string[]>(
     currentArtist?.additionalGenres ?? [],
   );
+  const parseArtistSocials = (artist?: typeof currentArtist) => {
+    if (!artist || !artist.socialLinks) return {};
+    const sl = artist.socialLinks;
+    if (typeof sl === "string") {
+      try {
+        const parsed = JSON.parse(sl);
+        return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+      } catch {
+        return {};
+      }
+    }
+    return typeof sl === "object" ? sl : {};
+  };
+
+  const initialSocials = parseArtistSocials(currentArtist);
+
   const [phoneNumber, setPhoneNumber] = useState(currentArtist?.phoneNumber ?? "");
-  const [instagram, setInstagram] = useState(currentArtist?.socialLinks.instagram ?? "");
-  const [facebook, setFacebook] = useState(currentArtist?.socialLinks.facebook ?? "");
-  const [tiktok, setTiktok] = useState(currentArtist?.socialLinks.tiktok ?? "");
+  const [instagram, setInstagram] = useState(initialSocials.instagram ?? "");
+  const [facebook, setFacebook] = useState(initialSocials.facebook ?? "");
+  const [tiktok, setTiktok] = useState(initialSocials.tiktok ?? "");
+  const [xTwitter, setXTwitter] = useState(initialSocials.x ?? "");
+  const [youtube, setYoutube] = useState(initialSocials.youtube ?? "");
   const [avatarKey, setAvatarKey] = useState(currentArtist?.avatarUrl ?? "c1");
   const [email, setEmail] = useState(currentUser?.email ?? "");
 
@@ -105,9 +125,12 @@ function ProfilePage() {
       setPrimaryGenre(currentArtist.primaryGenre || "");
       setAdditionalGenres(currentArtist.additionalGenres || []);
       setPhoneNumber(currentArtist.phoneNumber || "");
-      setInstagram(currentArtist.socialLinks.instagram || "");
-      setFacebook(currentArtist.socialLinks.facebook || "");
-      setTiktok(currentArtist.socialLinks.tiktok || "");
+      const s = parseArtistSocials(currentArtist);
+      setInstagram(s.instagram || "");
+      setFacebook(s.facebook || "");
+      setTiktok(s.tiktok || "");
+      setXTwitter(s.x || "");
+      setYoutube(s.youtube || "");
       setAvatarKey(currentArtist.avatarUrl || "c1");
     }
   }, [currentArtist]);
@@ -152,9 +175,12 @@ function ProfilePage() {
       setPrimaryGenre(currentArtist.primaryGenre || "");
       setAdditionalGenres(currentArtist.additionalGenres || []);
       setPhoneNumber(currentArtist.phoneNumber || "");
-      setInstagram(currentArtist.socialLinks.instagram || "");
-      setFacebook(currentArtist.socialLinks.facebook || "");
-      setTiktok(currentArtist.socialLinks.tiktok || "");
+      const s = parseArtistSocials(currentArtist);
+      setInstagram(s.instagram || "");
+      setFacebook(s.facebook || "");
+      setTiktok(s.tiktok || "");
+      setXTwitter(s.x || "");
+      setYoutube(s.youtube || "");
       setAvatarKey(currentArtist.avatarUrl || "c1");
     }
     setIsEditing(false);
@@ -210,11 +236,13 @@ function ProfilePage() {
         avatarUrl: avatarKey,
         phoneNumber: phoneNumber.trim(),
         socialLinks: {
-          ...currentArtist.socialLinks,
-          instagram: instagram.trim() || undefined,
-          facebook: facebook.trim() || undefined,
-          tiktok: tiktok.trim() || undefined,
+          ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
+          ...(facebook.trim() ? { facebook: facebook.trim() } : {}),
+          ...(tiktok.trim() ? { tiktok: tiktok.trim() } : {}),
+          ...(xTwitter.trim() ? { x: xTwitter.trim() } : {}),
+          ...(youtube.trim() ? { youtube: youtube.trim() } : {}),
         },
+
       });
 
       setSaved(true);
@@ -620,17 +648,18 @@ function ProfilePage() {
                   Social media
                 </h3>
 
-                {currentArtist.socialLinks &&
-                (currentArtist.socialLinks.instagram ||
-                  currentArtist.socialLinks.facebook ||
-                  currentArtist.socialLinks.tiktok) ? (
-                  <SocialIconsList socialLinks={currentArtist.socialLinks} />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No social media links connected. Click &quot;Edit profile&quot; to connect your
-                    Instagram, Facebook, or TikTok.
-                  </p>
-                )}
+                {(() => {
+                  const sl = parseArtistSocials(currentArtist);
+                  const hasAny = Boolean(sl.instagram || sl.facebook || sl.tiktok || sl.x || sl.youtube);
+                  return hasAny ? (
+                    <SocialIconsList socialLinks={sl} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No social media links connected. Click &quot;Edit profile&quot; to connect your
+                      Instagram, Facebook, TikTok, X, or YouTube.
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -914,13 +943,12 @@ function ProfilePage() {
                 </div>
               </Field>
 
-              {/* Social Media Links (Instagram, Facebook, TikTok ONLY) */}
+              {/* Social Media Links */}
               <div className="space-y-4 rounded-xl bg-elevated/30 p-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Social media links</h3>
                   <p className="text-xs text-muted-foreground">
-                    Connect your IG, Facebook, and TikTok. Only the official icons are displayed on
-                    your profile.
+                    Connect your Instagram, Facebook, TikTok, X, and YouTube. Official icons are displayed on your profile.
                   </p>
                 </div>
 
@@ -966,6 +994,36 @@ function ProfilePage() {
                       value={tiktok}
                       onChange={(e) => setTiktok(e.target.value)}
                       placeholder="@username or https://tiktok.com/@username"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  {/* X (Twitter) */}
+                  <div>
+                    <label className="mb-1 flex items-center gap-2 text-xs font-medium text-foreground">
+                      <XIcon className="h-3.5 w-3.5 text-foreground" />
+                      <span>X (Twitter)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={xTwitter}
+                      onChange={(e) => setXTwitter(e.target.value)}
+                      placeholder="@username or https://x.com/username"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  {/* YouTube */}
+                  <div>
+                    <label className="mb-1 flex items-center gap-2 text-xs font-medium text-foreground">
+                      <YouTubeIcon className="h-3.5 w-3.5 text-[#FF0000]" />
+                      <span>YouTube</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={youtube}
+                      onChange={(e) => setYoutube(e.target.value)}
+                      placeholder="@channel or https://youtube.com/@channel"
                       className={inputClass}
                     />
                   </div>

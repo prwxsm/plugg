@@ -5,16 +5,30 @@ export interface SocialLinks {
   instagram?: string | undefined;
   facebook?: string | undefined;
   tiktok?: string | undefined;
+  x?: string | undefined;
+  youtube?: string | undefined;
   [key: string]: string | undefined;
 }
 
-export function formatSocialUrl(platform: "instagram" | "facebook" | "tiktok", handleOrUrl?: string): string | null {
+export function formatSocialUrl(
+  platform: "instagram" | "facebook" | "tiktok" | "x" | "youtube",
+  handleOrUrl?: string
+): string | null {
   if (!handleOrUrl || !handleOrUrl.trim()) return null;
   const trimmed = handleOrUrl.trim();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+
+  // If already starts with http:// or https://
+  if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }
-  const cleanHandle = trimmed.replace(/^@+/, "");
+
+  // If user entered domain like instagram.com/... or www.instagram.com/...
+  if (/^(www\.)?(instagram\.com|facebook\.com|tiktok\.com|x\.com|twitter\.com|youtube\.com|youtu\.be)\//i.test(trimmed)) {
+    return `https://${trimmed.replace(/^www\./i, "")}`;
+  }
+
+  // Treat as handle / username
+  const cleanHandle = trimmed.replace(/^@+/, "").trim();
   if (!cleanHandle) return null;
 
   switch (platform) {
@@ -24,10 +38,15 @@ export function formatSocialUrl(platform: "instagram" | "facebook" | "tiktok", h
       return `https://facebook.com/${cleanHandle}`;
     case "tiktok":
       return `https://www.tiktok.com/@${cleanHandle}`;
+    case "x":
+      return `https://x.com/${cleanHandle}`;
+    case "youtube":
+      return `https://youtube.com/@${cleanHandle}`;
     default:
       return null;
   }
 }
+
 
 export const InstagramIcon: FC<SVGProps<SVGSVGElement>> = (props) => (
   <svg
@@ -95,7 +114,7 @@ export const XIcon: FC<SVGProps<SVGSVGElement>> = (props) => (
 );
 
 interface SocialIconsListProps {
-  socialLinks?: SocialLinks | null;
+  socialLinks?: SocialLinks | string | null;
   className?: string;
   iconClassName?: string;
   buttonClassName?: string;
@@ -109,27 +128,53 @@ export function SocialIconsList({
 }: SocialIconsListProps) {
   if (!socialLinks) return null;
 
+  let linksObj: SocialLinks = {};
+  if (typeof socialLinks === "string") {
+    try {
+      const parsed = JSON.parse(socialLinks);
+      linksObj = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+    } catch {
+      linksObj = {};
+    }
+  } else if (typeof socialLinks === "object") {
+    linksObj = socialLinks;
+  }
+
   const platforms = [
     {
       key: "instagram" as const,
       label: "Instagram",
-      url: formatSocialUrl("instagram", socialLinks.instagram),
+      url: formatSocialUrl("instagram", linksObj.instagram),
       Icon: InstagramIcon,
       hoverClass: "hover:text-[#E4405F] hover:border-[#E4405F]/40 hover:bg-[#E4405F]/10",
     },
     {
       key: "facebook" as const,
       label: "Facebook",
-      url: formatSocialUrl("facebook", socialLinks.facebook),
+      url: formatSocialUrl("facebook", linksObj.facebook),
       Icon: FacebookIcon,
       hoverClass: "hover:text-[#1877F2] hover:border-[#1877F2]/40 hover:bg-[#1877F2]/10",
     },
     {
       key: "tiktok" as const,
       label: "TikTok",
-      url: formatSocialUrl("tiktok", socialLinks.tiktok),
+      url: formatSocialUrl("tiktok", linksObj.tiktok),
       Icon: TikTokIcon,
       hoverClass: "hover:text-[#25F4EE] hover:border-[#25F4EE]/40 hover:bg-[#25F4EE]/10",
+    },
+    {
+      key: "x" as const,
+      label: "X (Twitter)",
+      url: formatSocialUrl("x", linksObj.x),
+      Icon: XIcon,
+      hoverClass: "hover:text-white hover:border-white/40 hover:bg-white/10",
+    },
+    {
+      key: "youtube" as const,
+      label: "YouTube",
+      url: formatSocialUrl("youtube", linksObj.youtube),
+      Icon: YouTubeIcon,
+      hoverClass: "hover:text-[#FF0000] hover:border-[#FF0000]/40 hover:bg-[#FF0000]/10",
     },
   ];
 

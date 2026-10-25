@@ -8,6 +8,29 @@ import { tracks as seedTracks } from "@/data/tracks";
 import { artists as seedArtists } from "@/data/artists";
 import { releases as seedReleases } from "@/data/releases";
 
+export function parseSocialLinks(val: unknown): Record<string, string> {
+  if (!val) return {};
+  let parsed: any = val;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+      if (typeof parsed === "string") {
+        parsed = JSON.parse(parsed);
+      }
+    } catch {
+      return {};
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return {};
+  const clean: Record<string, string> = {};
+  for (const k of ["instagram", "facebook", "tiktok", "x", "youtube"]) {
+    if (typeof parsed[k] === "string" && parsed[k].trim()) {
+      clean[k] = parsed[k].trim();
+    }
+  }
+  return clean;
+}
+
 export const getInitialData = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getUserFromSession();
 
@@ -57,7 +80,7 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     monthlyListeners: Number(a.monthlyListeners) || 0,
     totalPlays: Number(a.totalPlays) || 0,
     phoneNumber: a.phoneNumber || "",
-    socialLinks: (typeof a.socialLinks === "object" && a.socialLinks !== null ? a.socialLinks : {}) as {
+    socialLinks: parseSocialLinks(a.socialLinks) as {
       instagram?: string;
       facebook?: string;
       x?: string;
@@ -624,6 +647,8 @@ export const updateArtistProfileFn = createServerFn({ method: "POST" })
       }
     }
 
+    const cleanSocial = socialLinks ? parseSocialLinks(socialLinks) : null;
+
     await sql`
       UPDATE artists
       SET username = COALESCE(${cleanUsername}, username),
@@ -637,12 +662,12 @@ export const updateArtistProfileFn = createServerFn({ method: "POST" })
           avatar_url = COALESCE(${avatarUrl ?? null}, avatar_url),
           cover_url = COALESCE(${coverUrl ?? null}, cover_url),
           phone_number = COALESCE(${phoneNumber ?? null}, phone_number),
-          social_links = COALESCE(${socialLinks ? JSON.stringify(socialLinks) : null}::jsonb, social_links),
+          social_links = COALESCE(${cleanSocial ? sql.json(cleanSocial) : null}, social_links),
           updated_at = now()
       WHERE id = ${user.artistId}
     `;
 
-    const [updated] = await sql<Artist[]>`
+    const [updated] = await sql<any[]>`
       SELECT id, username, display_name as "displayName", bio, location, country, city,
              primary_genre as "primaryGenre", additional_genres as "additionalGenres",
              avatar_url as "avatarUrl", cover_url as "coverUrl", verified, fans, 
@@ -652,7 +677,15 @@ export const updateArtistProfileFn = createServerFn({ method: "POST" })
       WHERE id = ${user.artistId}
     `;
 
-    return updated;
+    if (!updated) return null;
+
+    return {
+      ...updated,
+      fans: Number(updated.fans) || 0,
+      monthlyListeners: Number(updated.monthlyListeners) || 0,
+      totalPlays: Number(updated.totalPlays) || 0,
+      socialLinks: parseSocialLinks(updated.socialLinks),
+    };
   });
 
 export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
