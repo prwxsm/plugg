@@ -73,7 +73,7 @@ function AuthCardWrapper({
 
       {/* Desktop overlay modal view: floating card over blurred background */}
       <div
-        className="hidden md:flex fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
+        className="hidden md:flex fixed inset-0 z-[100] items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
