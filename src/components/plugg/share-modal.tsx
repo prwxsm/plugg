@@ -1,5 +1,4 @@
-import { X, Play, Pause, Copy, Check, Share2 } from "lucide-react";
-import { useState } from "react";
+import { X, Play, Pause, Share2 } from "lucide-react";
 import { usePlugg } from "@/state/plugg-store";
 import { formatDuration } from "@/lib/plugg";
 import { art } from "@/data/covers";
@@ -15,7 +14,6 @@ export function ShareModal({ trackId, onClose }: ShareModalProps) {
   const { tracks, artists, playTrack, togglePlay, currentTrack, isPlaying } = usePlugg();
   const track = tracks.find((t) => t.id === trackId);
   const artist = artists.find((a) => a.id === track?.artistId);
-  const [copied, setCopied] = useState(false);
 
   if (!track || !artist) return null;
 
@@ -24,19 +22,9 @@ export function ShareModal({ trackId, onClose }: ShareModalProps) {
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://plugg.app";
   const shareUrl = `${origin}/track/${track.id}`;
-
   const shareTitle = `${track.title} — ${artist.displayName}`;
-  const shareText = `Stream "${track.title}" by ${artist.displayName}${track.features ? ` ft. ${track.features}` : ""} on Plugg:\n${shareUrl}`;
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    toast.success("Stream link copied! Paste anywhere to share artwork & details");
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleShare = async () => {
-    // If mobile or desktop browser supports native share sheet
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({
@@ -51,8 +39,9 @@ export function ShareModal({ trackId, onClose }: ShareModalProps) {
         }
       }
     }
-    // Fallback if native share not supported or cancelled
-    handleCopyLink();
+    // Fallback on desktop without navigator.share
+    navigator.clipboard.writeText(shareUrl);
+    toast.success("Stream link copied to clipboard!");
   };
 
   return (
@@ -128,53 +117,20 @@ export function ShareModal({ trackId, onClose }: ShareModalProps) {
           </div>
         </div>
 
-        {/* Stream URL Box */}
-        <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-          <span className="text-xs text-white/60 truncate flex-1 font-mono select-all">
-            {shareUrl}
-          </span>
-          <button
-            onClick={handleCopyLink}
-            className="flex items-center gap-1 text-xs font-bold text-white hover:text-primary transition-colors shrink-0"
-          >
-            {copied ? (
-              <>
-                <Check size={14} className="text-primary" />
-                <span className="text-primary">Copied</span>
-              </>
-            ) : (
-              <>
-                <Copy size={14} />
-                <span>Copy</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Action Buttons: Unified "Share" button for all displays + Copy Link */}
-        <div className="mt-3.5 flex items-center gap-2.5">
-          {/* Primary Share Button: invokes native mobile share sheet (or copies on desktop) */}
+        {/* Action Button: Share only */}
+        <div className="mt-4">
           <button
             onClick={handleShare}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-sm py-2.5 px-4 shadow-lg transition-all active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-sm py-3 px-4 shadow-lg transition-all active:scale-[0.98]"
           >
             <Share2 size={16} />
             <span>Share</span>
           </button>
-
-          {/* Secondary Copy Button */}
-          <button
-            onClick={handleCopyLink}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm py-2.5 px-4 border border-white/10 transition-all active:scale-[0.98]"
-          >
-            {copied ? <Check size={15} className="text-primary" /> : <Copy size={15} />}
-            <span>{copied ? "Copied" : "Copy Link"}</span>
-          </button>
         </div>
 
-        {/* Footnote about social platform link preview */}
-        <p className="mt-3 text-[11px] text-center text-white/40 leading-tight">
-          When shared, social platforms embed the artwork, song details & stream link.
+        {/* Footnote text */}
+        <p className="mt-3 text-xs text-center text-white/40 leading-tight">
+          Share to other platforms
         </p>
       </div>
     </div>
