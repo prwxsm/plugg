@@ -17,6 +17,7 @@ import {
   Layers,
   Disc3,
   FileText,
+  Hash,
 } from "lucide-react";
 import {
   Area,
@@ -969,7 +970,15 @@ function ScheduledEditor({ releaseId }: { releaseId: string }) {
       </Field>
       {releaseTracks.map((track) => (
         <div key={track.id} className="space-y-4 border-t border-border pt-4">
-          <p className="text-sm font-medium">{track.title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium">{track.title}</p>
+            {track.pluggTrackId ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] font-mono text-muted-foreground tracking-wide" title="Plugg Track ID">
+                <Hash size={9} className="text-primary" />
+                {track.pluggTrackId}
+              </span>
+            ) : null}
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <CollaboratorField
               label="Featured artists"

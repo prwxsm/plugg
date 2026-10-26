@@ -60,6 +60,8 @@ export interface Release {
 
 export interface Track {
   id: string;
+  /** Permanent Plugg Track ID in PLG-YYYY-XXXXXX format. */
+  pluggTrackId?: string | undefined;
   artistId: string;
   releaseId: string;
   title: string;

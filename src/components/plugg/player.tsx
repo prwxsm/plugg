@@ -10,7 +10,9 @@ import {
   Shuffle,
   SkipBack,
   SkipForward,
+  Volume1,
   Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -231,6 +233,22 @@ export function PlayerBar() {
   const artist = currentTrack ? artists.find((item) => item.id === currentTrack.artistId) : null;
   const hasTrack = Boolean(currentTrack);
 
+  const prevVolumeRef = useRef(volume > 0 ? volume : 0.8);
+  useEffect(() => {
+    if (volume > 0) {
+      prevVolumeRef.current = volume;
+    }
+  }, [volume]);
+
+  const toggleMute = () => {
+    if (volume > 0) {
+      prevVolumeRef.current = volume;
+      setVolume(0);
+    } else {
+      setVolume(prevVolumeRef.current > 0 ? prevVolumeRef.current : 0.8);
+    }
+  };
+
   return (
     <>
       {/* ── Desktop player bar (Always visible at the bottom, even in full screen) ── */}
@@ -293,11 +311,20 @@ export function PlayerBar() {
                 size="icon"
                 onClick={() => toggleLike(currentTrack.id)}
                 aria-label={isLiked(currentTrack.id) ? "Unlike song" : "Like song"}
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                className={cn(
+                  "group/like h-8 w-8 shrink-0 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  isLiked(currentTrack.id) && "text-primary"
+                )}
+                title={isLiked(currentTrack.id) ? "Unlike" : "Like"}
               >
                 <Heart
                   size={16}
-                  className={cn(isLiked(currentTrack.id) ? "fill-primary text-primary" : "")}
+                  className={cn(
+                    "transition-colors",
+                    isLiked(currentTrack.id)
+                      ? "fill-current group-hover/like:fill-accent-foreground group-hover/like:text-accent-foreground"
+                      : "group-hover/like:text-accent-foreground"
+                  )}
                 />
               </Button>
             </div>
@@ -323,12 +350,16 @@ export function PlayerBar() {
                 aria-label="Shuffle"
                 disabled={!hasTrack}
                 className={cn(
-                  "h-8 w-8 text-muted-foreground hover:text-foreground",
-                  shuffle && "text-primary hover:text-primary",
+                  "group/shuffle relative h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  shuffle && "text-primary",
                   !hasTrack && "pointer-events-none opacity-30"
                 )}
+                title={shuffle ? "Disable shuffle" : "Enable shuffle"}
               >
-                <Shuffle size={15} />
+                <Shuffle size={15} className="transition-colors group-hover/shuffle:text-accent-foreground" />
+                {shuffle && (
+                  <span className="absolute bottom-1 h-0.5 w-0.5 rounded-full bg-primary group-hover/shuffle:bg-accent-foreground" />
+                )}
               </Button>
 
               <Button
@@ -337,9 +368,13 @@ export function PlayerBar() {
                 onClick={previous}
                 aria-label="Previous song"
                 disabled={!hasTrack}
-                className={cn("h-8 w-8", !hasTrack && "pointer-events-none opacity-30")}
+                className={cn(
+                  "group/prev h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  !hasTrack && "pointer-events-none opacity-30"
+                )}
+                title="Previous"
               >
-                <SkipBack size={18} fill="currentColor" />
+                <SkipBack size={18} fill="currentColor" className="transition-colors group-hover/prev:text-accent-foreground" />
               </Button>
 
               <PlayButton
@@ -355,9 +390,13 @@ export function PlayerBar() {
                 onClick={next}
                 aria-label="Next song"
                 disabled={!hasTrack}
-                className={cn("h-8 w-8", !hasTrack && "pointer-events-none opacity-30")}
+                className={cn(
+                  "group/next h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  !hasTrack && "pointer-events-none opacity-30"
+                )}
+                title="Next"
               >
-                <SkipForward size={18} fill="currentColor" />
+                <SkipForward size={18} fill="currentColor" className="transition-colors group-hover/next:text-accent-foreground" />
               </Button>
 
               <Button
@@ -367,12 +406,20 @@ export function PlayerBar() {
                 aria-label="Repeat"
                 disabled={!hasTrack}
                 className={cn(
-                  "relative h-8 w-8 text-muted-foreground hover:text-foreground",
-                  repeatMode !== "off" && "text-primary hover:text-primary",
+                  "group/repeat relative h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  repeatMode !== "off" && "text-primary",
                   !hasTrack && "pointer-events-none opacity-30"
                 )}
+                title={repeatMode === "one" ? "Repeat: Current Track" : repeatMode === "all" ? "Repeat: All" : "Repeat: Off"}
               >
-                {repeatMode === "one" ? <Repeat1 size={15} /> : <Repeat size={15} />}
+                {repeatMode === "one" ? (
+                  <Repeat1 size={15} className="transition-colors group-hover/repeat:text-accent-foreground" />
+                ) : (
+                  <Repeat size={15} className="transition-colors group-hover/repeat:text-accent-foreground" />
+                )}
+                {repeatMode !== "off" && (
+                  <span className="absolute bottom-1 h-0.5 w-0.5 rounded-full bg-primary group-hover/repeat:bg-accent-foreground" />
+                )}
               </Button>
             </div>
 
@@ -391,14 +438,41 @@ export function PlayerBar() {
               onClick={() => setFullPlayerOpen(!fullPlayerOpen)}
               aria-label={fullPlayerOpen ? "Exit full player" : "Open full player"}
               disabled={!hasTrack}
-              className={cn("h-9 w-9 text-muted-foreground hover:text-foreground", fullPlayerOpen && "text-primary bg-secondary/60")}
+              className={cn(
+                "group/expand h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                fullPlayerOpen && "bg-secondary/60 text-foreground",
+                !hasTrack && "pointer-events-none opacity-30"
+              )}
               title={fullPlayerOpen ? "Collapse full screen" : "Full screen"}
             >
-              {fullPlayerOpen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+              {fullPlayerOpen ? (
+                <Minimize2 size={16} className="transition-colors group-hover/expand:text-accent-foreground" />
+              ) : (
+                <Maximize2 size={16} className="transition-colors group-hover/expand:text-accent-foreground" />
+              )}
             </Button>
 
-            <div className="flex items-center gap-2 pl-1">
-              <Volume2 size={17} className="text-muted-foreground" />
+            <div className="flex items-center gap-1 pl-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMute}
+                aria-label={volume === 0 ? "Unmute" : "Mute"}
+                disabled={!hasTrack}
+                className={cn(
+                  "group/vol h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  !hasTrack && "pointer-events-none opacity-30"
+                )}
+                title={volume === 0 ? "Unmute" : "Mute"}
+              >
+                {volume === 0 ? (
+                  <VolumeX size={17} className="transition-colors group-hover/vol:text-accent-foreground" />
+                ) : volume < 0.5 ? (
+                  <Volume1 size={17} className="transition-colors group-hover/vol:text-accent-foreground" />
+                ) : (
+                  <Volume2 size={17} className="transition-colors group-hover/vol:text-accent-foreground" />
+                )}
+              </Button>
               <input
                 type="range"
                 min={0}
@@ -417,10 +491,10 @@ export function PlayerBar() {
                 size="icon"
                 onClick={clearPlayer}
                 aria-label="Close player"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground ml-1"
+                className="group/close h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors ml-1"
                 title="Dismiss player"
               >
-                <X size={15} />
+                <X size={15} className="transition-colors group-hover/close:text-accent-foreground" />
               </Button>
             ) : null}
           </div>
@@ -534,9 +608,9 @@ export function FullPlayer() {
         </header>
 
         {/* Main Content Area: 45% Artwork (Left) / 55% Information (Right) */}
-        <div className="my-auto grid w-full flex-1 grid-cols-1 items-center gap-8 py-2 lg:grid-cols-[45%_55%] lg:gap-14 overflow-hidden">
+        <div className="my-auto grid w-full flex-1 grid-cols-1 items-center gap-8 py-2 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)] lg:gap-14">
           {/* Left Column: Visual Identity (Large Artwork, Title, Artist — without duplicate like icon) */}
-          <div className="flex flex-col items-center lg:items-start justify-center">
+          <div className="flex min-w-0 flex-col items-center lg:items-start justify-center">
             <div className="relative aspect-square w-full max-w-[340px] sm:max-w-[420px] overflow-hidden rounded-2xl shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)] ring-1 ring-white/10 group transition-all duration-300">
               <img
                 src={art(currentTrack.coverUrl)}
@@ -580,7 +654,7 @@ export function FullPlayer() {
           </div>
 
           {/* Right Column: Information Layer (Lyrics | About | Credits) */}
-          <div className="flex w-full flex-col justify-center overflow-hidden">
+          <div className="flex w-full min-w-0 flex-col justify-center">
             {/* Tabs Header */}
             <div className="flex items-center gap-8 border-b border-border/40 pb-3">
               {(["lyrics", "about", "credits"] as const).map((tab) => {
@@ -633,17 +707,17 @@ export function FullPlayer() {
                   {artist ? (
                     <div className="rounded-2xl bg-surface/70 backdrop-blur-md p-6 space-y-6">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
                           <img
                             src={art(artist.avatarUrl)}
                             alt={artist.displayName}
-                            className="h-16 w-16 rounded-full object-cover ring-2 ring-border shadow-md"
+                            className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-border shadow-md"
                           />
-                          <div>
-                            <h3 className="text-lg font-bold text-foreground">
+                          <div className="min-w-0">
+                            <h3 className="text-lg font-bold text-foreground truncate">
                               {artist.displayName}
                             </h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
                               {formatCount(artist.monthlyListeners)} monthly listeners
                             </p>
                           </div>
@@ -653,7 +727,7 @@ export function FullPlayer() {
                           to="/artist/$username"
                           params={{ username: artist.username }}
                           onClick={() => setFullPlayerOpen(false)}
-                          className="rounded-full bg-elevated px-4 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
+                          className="shrink-0 rounded-full bg-elevated px-4 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
                         >
                           View profile
                         </Link>
@@ -671,12 +745,12 @@ export function FullPlayer() {
                       ) : null}
 
                       <div className="grid grid-cols-2 gap-4 border-t border-border/40 pt-4 text-xs">
-                        <div>
+                        <div className="min-w-0">
                           <span className="text-muted-foreground block">Verified Artist</span>
-                          <span className="font-medium text-foreground mt-0.5 block">Plugg Artist</span>
+                          <span className="font-medium text-foreground mt-0.5 block truncate">Plugg Artist</span>
                         </div>
                         {release ? (
-                          <div>
+                          <div className="min-w-0">
                             <span className="text-muted-foreground block">Current Release</span>
                             <span className="font-medium text-foreground mt-0.5 block truncate">{release.title}</span>
                           </div>
@@ -721,9 +795,9 @@ export function FullPlayer() {
                       {release ? (
                         <div className="pt-3.5 space-y-1">
                           <span className="text-xs font-medium text-muted-foreground block">Release info</span>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-foreground">{release.title}</span>
-                            <span className="rounded bg-elevated px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-medium text-foreground truncate">{release.title}</span>
+                            <span className="shrink-0 rounded bg-elevated px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                               {release.type}
                             </span>
                           </div>

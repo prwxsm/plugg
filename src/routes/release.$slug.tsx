@@ -1,9 +1,10 @@
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
-import { Heart, Plus } from "lucide-react";
+import { Heart } from "lucide-react";
 import { useState } from "react";
 
 import { PlayButton, Rail, ReleaseCard, TrackRow } from "@/components/plugg/media";
 import { Button, SectionHeader } from "@/components/plugg/primitives";
+import { AddToPlaylistButton } from "@/components/plugg/add-to-playlist-button";
 import { artists as seedArtists } from "@/data/artists";
 import { art } from "@/data/covers";
 import { releases as seedReleases } from "@/data/releases";
@@ -40,12 +41,9 @@ function ReleasePage() {
     togglePlay,
     currentTrack,
     isPlaying,
-    playlists,
-    addTrackToPlaylist,
     isLiked,
     toggleLike,
   } = usePlugg();
-  const [addedTo, setAddedTo] = useState<string | null>(null);
 
   const release = releases.find((r) => r.slug === slug);
   if (!release) throw notFound();
@@ -104,19 +102,14 @@ function ReleasePage() {
                 {isLiked(releaseTracks[0]!.id) ? "Liked" : "Like"}
               </Button>
             ) : null}
-            {playlists[0] && releaseTracks[0] ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  releaseTracks.forEach((t) => addTrackToPlaylist(playlists[0]!.id, t.id));
-                  setAddedTo(playlists[0]!.name);
-                }}
-              >
-                <Plus size={15} /> Add to {playlists[0].name}
-              </Button>
+            {releaseTracks.length > 0 ? (
+              <AddToPlaylistButton
+                trackIds={ids}
+                variant="outline"
+                label="Add to Playlist"
+              />
             ) : null}
           </div>
-          {addedTo ? <p className="mt-3 text-xs text-primary">Added to {addedTo}</p> : null}
         </div>
       </section>
 

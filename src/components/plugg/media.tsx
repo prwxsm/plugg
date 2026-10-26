@@ -442,7 +442,8 @@ export function TrackRow({
                         return;
                       }
                       if (track.audioUrl) {
-                        const urlExt = track.audioUrl.split("?")[0].split(".").pop()?.toLowerCase();
+                        const urlPath = track.audioUrl.split("?")[0] ?? "";
+                        const urlExt = urlPath.split(".").pop()?.toLowerCase();
                         const ext = urlExt && ["mp3", "wav", "flac", "aac", "ogg", "m4a"].includes(urlExt) ? urlExt : "mp3";
                         const fileName = buildTrackDownloadFilename(track.title, artist?.displayName, track.features, ext);
                         

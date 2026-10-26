@@ -1,9 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Play, Pause, Heart, Plus, Download, Share2, Sparkles, Music2 } from "lucide-react";
+import { Play, Pause, Heart, Download, Share2, Sparkles, Music2 } from "lucide-react";
 
 import { Rail, ReleaseCard, TrackRow } from "@/components/plugg/media";
 import { Button, SectionHeader } from "@/components/plugg/primitives";
+import { AddToPlaylistButton } from "@/components/plugg/add-to-playlist-button";
 import { ShareModal } from "@/components/plugg/share-modal";
 import { art } from "@/data/covers";
 import { formatCount, formatDuration } from "@/lib/plugg";
@@ -36,9 +37,8 @@ export const Route = createFileRoute("/track/$id")({
     
     // Resolve absolute image URL for WhatsApp / social crawlers
     const rawCover = art(loaderData.coverUrl);
-    const domain = typeof process !== "undefined" && process.env?.VITE_APP_URL 
-      ? process.env.VITE_APP_URL.replace(/\/$/, "") 
-      : "https://plugg.app";
+    const envUrl = typeof process !== "undefined" ? process.env["VITE_APP_URL"] : undefined;
+    const domain = envUrl ? envUrl.replace(/\/$/, "") : "https://plugg.app";
     const imageUrl = rawCover.startsWith("http://") || rawCover.startsWith("https://")
       ? rawCover
       : `${domain}${rawCover.startsWith("/") ? "" : "/"}${rawCover}`;
@@ -91,11 +91,11 @@ function TrackPage() {
   } = usePlugg();
 
   const [shareOpen, setShareOpen] = useState(false);
-  const [addedPlaylist, setAddedPlaylist] = useState<string | null>(null);
 
   // Match hydrated client track or fallback to loaderData
   const track = tracks.find((t) => t.id === id) || {
     id: loaderData.id,
+    pluggTrackId: loaderData.pluggTrackId,
     artistId: loaderData.artistId,
     releaseId: loaderData.releaseId,
     title: loaderData.title,
@@ -217,20 +217,11 @@ function TrackPage() {
                 <span>{liked ? "Liked" : "Like"}</span>
               </Button>
 
-              {playlists.length > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    addTrackToPlaylist(playlists[0]!.id, track.id);
-                    setAddedPlaylist(playlists[0]!.name);
-                    toast.success(`Added to ${playlists[0]!.name}`);
-                  }}
-                  className="rounded-full"
-                >
-                  <Plus size={16} />
-                  <span>{addedPlaylist ? `Added to ${addedPlaylist}` : "Add to Playlist"}</span>
-                </Button>
-              )}
+              <AddToPlaylistButton
+                trackIds={[track.id]}
+                variant="outline"
+                label="Add to Playlist"
+              />
 
               <Button
                 variant="outline"

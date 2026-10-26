@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Home as GuestHome } from "@/routes/index";
 import { Discover as GuestDiscover } from "@/routes/discover";
 
-function GuestBackground({ returnTo }: { returnTo?: string }) {
+function GuestBackground({ returnTo }: { returnTo?: string | undefined }) {
   if (returnTo?.startsWith("/discover")) {
     return <GuestDiscover />;
   }

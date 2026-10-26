@@ -96,8 +96,11 @@ CREATE TABLE releases (
 -- TRACKS
 -- ---------------------------------------------------------------------------
 
+CREATE SEQUENCE IF NOT EXISTS plugg_track_id_seq START WITH 1 INCREMENT BY 1 NO MAXVALUE NO CYCLE;
+
 CREATE TABLE tracks (
     id               TEXT PRIMARY KEY,
+    plugg_track_id   TEXT NOT NULL UNIQUE,
     artist_id        TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
     release_id       TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
     title            TEXT NOT NULL,
@@ -218,6 +221,7 @@ CREATE TABLE analytics_release_performance (
 -- ---------------------------------------------------------------------------
 
 CREATE INDEX idx_tracks_artist   ON tracks(artist_id);
+CREATE INDEX idx_tracks_plugg_id ON tracks(plugg_track_id);
 CREATE INDEX idx_tracks_release  ON tracks(release_id);
 CREATE INDEX idx_tracks_genre    ON tracks(genre);
 CREATE INDEX idx_releases_artist ON releases(artist_id);

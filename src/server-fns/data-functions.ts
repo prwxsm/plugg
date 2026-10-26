@@ -93,6 +93,7 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
   const dbTracks = await sql<
     {
       id: string;
+      pluggTrackId: string;
       artistId: string;
       releaseId: string;
       title: string;
@@ -111,7 +112,7 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
       lyrics: string | null;
     }[]
   >`
-    SELECT id, artist_id, release_id, title, slug, genre, cover_url, audio_url, 
+    SELECT id, plugg_track_id, artist_id, release_id, title, slug, genre, cover_url, audio_url, 
            duration_seconds, play_count, COALESCE(download_count, 0) as download_count,
            COALESCE(like_count, 0) as like_count, published, release_date, features, producers, lyrics 
     FROM tracks
@@ -120,6 +121,7 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
 
   const tracks: Track[] = dbTracks.map((t) => ({
     id: t.id,
+    pluggTrackId: t.pluggTrackId || undefined,
     artistId: t.artistId,
     releaseId: t.releaseId,
     title: t.title,
@@ -221,27 +223,34 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     };
   });
 
-  // Fetch playlists and playlist_tracks
-  const dbPlaylists = await sql<
-    {
-      id: string;
-      userId: string;
-      name: string;
-      description: string;
-      coverUrl: string;
-    }[]
-  >`
-    SELECT id, user_id, name, description, cover_url 
-    FROM playlists
-    WHERE is_mock = false
-    ORDER BY created_at DESC
-  `;
+  // Fetch playlists and playlist_tracks (for authenticated user only)
+  const dbPlaylists = user
+    ? await sql<
+        {
+          id: string;
+          userId: string;
+          name: string;
+          description: string;
+          coverUrl: string;
+        }[]
+      >`
+        SELECT id, user_id, name, description, cover_url 
+        FROM playlists
+        WHERE user_id = ${user.id} AND is_mock = false
+        ORDER BY created_at DESC
+      `
+    : [];
 
-  const playlistTrackLinks = await sql<{ playlistId: string; trackId: string; position: number }[]>`
-    SELECT playlist_id, track_id, position 
-    FROM playlist_tracks 
-    ORDER BY position ASC
-  `;
+  const playlistIds = dbPlaylists.map((p) => p.id);
+  const playlistTrackLinks =
+    playlistIds.length > 0
+      ? await sql<{ playlistId: string; trackId: string; position: number }[]>`
+          SELECT playlist_id, track_id, position 
+          FROM playlist_tracks 
+          WHERE playlist_id = ANY(${playlistIds})
+          ORDER BY position ASC
+        `
+      : [];
   const playlistTrackMap = new Map<string, string[]>();
   for (const link of playlistTrackLinks) {
     const list = playlistTrackMap.get(link.playlistId) ?? [];
@@ -758,13 +767,23 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         const songBaseSlug = song.title.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-") || "track";
         const songSlug = `${songBaseSlug}-${Math.floor(100 + Math.random() * 900)}`;
 
+        // Generate Plugg Track ID using the sequence (concurrency-safe)
+        const idRows = await tx<{ pluggTrackId: string }[]>`
+          SELECT 'PLG-' || EXTRACT(YEAR FROM now())::INT || '-' || LPAD(nextval('plugg_track_id_seq')::TEXT, 6, '0') AS plugg_track_id
+        `;
+        const newPluggTrackId = idRows[0]?.pluggTrackId;
+        if (!newPluggTrackId) {
+          throw new Error("Failed to generate Plugg Track ID");
+        }
+
         await tx`
           INSERT INTO tracks (
-            id, artist_id, release_id, title, slug, genre, cover_url, audio_url,
+            id, plugg_track_id, artist_id, release_id, title, slug, genre, cover_url, audio_url,
             duration_seconds, play_count, published, release_date, features, producers, lyrics, is_mock
           )
           VALUES (
             ${trackId},
+            ${newPluggTrackId},
             ${user.artistId!},
             ${releaseId},
             ${song.title},
@@ -960,6 +979,7 @@ export const getTrackShareData = createServerFn({ method: "GET" })
       const dbTracks = await sql<
         {
           id: string;
+          pluggTrackId: string;
           artistId: string;
           releaseId: string;
           title: string;
@@ -979,7 +999,7 @@ export const getTrackShareData = createServerFn({ method: "GET" })
           releaseSlug: string | null;
         }[]
       >`
-        SELECT t.id, t.artist_id as "artistId", t.release_id as "releaseId", t.title, t.slug,
+        SELECT t.id, t.plugg_track_id as "pluggTrackId", t.artist_id as "artistId", t.release_id as "releaseId", t.title, t.slug,
                t.genre, t.cover_url as "coverUrl", t.audio_url as "audioUrl", t.duration_seconds as "durationSeconds",
                t.play_count as "playCount", t.features, t.producers, t.lyrics,
                a.display_name as "artistName", a.username as "artistUsername", a.avatar_url as "artistAvatarUrl",
@@ -995,6 +1015,7 @@ export const getTrackShareData = createServerFn({ method: "GET" })
         const row = dbTracks[0]!;
         return {
           id: row.id,
+          pluggTrackId: row.pluggTrackId || undefined,
           artistId: row.artistId,
           releaseId: row.releaseId,
           title: row.title,
