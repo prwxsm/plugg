@@ -1,16 +1,18 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Play, Pause, Heart, Download, Share2, Sparkles, Music2 } from "lucide-react";
+import { Play, Pause, Heart, Download, Share2, Sparkles, Music2, ChevronDown } from "lucide-react";
 
 import { Rail, ReleaseCard, TrackRow } from "@/components/plugg/media";
 import { Button, SectionHeader } from "@/components/plugg/primitives";
 import { AddToPlaylistButton } from "@/components/plugg/add-to-playlist-button";
 import { ShareModal } from "@/components/plugg/share-modal";
 import { art } from "@/data/covers";
-import { formatCount, formatDuration } from "@/lib/plugg";
+import { formatCount, formatDuration, buildTrackDownloadFilename } from "@/lib/plugg";
+import { cn } from "@/lib/utils";
 import { getTrackShareData } from "@/server-fns/data-functions";
 import { usePlugg } from "@/state/plugg-store";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/track/$id")({
   loader: async ({ params }) => {
@@ -88,9 +90,11 @@ function TrackPage() {
     playlists,
     addTrackToPlaylist,
     recordDownload,
+    settings,
   } = usePlugg();
 
   const [shareOpen, setShareOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
 
   // Match hydrated client track or fallback to loaderData
   const track = tracks.find((t) => t.id === id) || {
@@ -223,18 +227,75 @@ function TrackPage() {
                 label="Add to Playlist"
               />
 
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (!recordDownload(track.id)) {
-                    toast.error("Download limit reached for today");
-                  }
-                }}
-                className="rounded-full"
-              >
-                <Download size={16} />
-                <span>Download</span>
-              </Button>
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  onClick={() => setDownloadOpen((prev) => !prev)}
+                  className="rounded-full gap-2 cursor-pointer"
+                >
+                  <Download size={16} />
+                  <span>Download</span>
+                  <ChevronDown
+                    size={14}
+                    className={cn("transition-transform duration-200", downloadOpen && "rotate-180")}
+                  />
+                </Button>
+
+                {downloadOpen && (
+                  <div className="absolute left-0 sm:left-auto sm:right-0 z-50 mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+                    {[
+                      { id: "data_saver" as const, label: "Data Saver (96 kbps)" },
+                      { id: "standard" as const, label: "Standard (160 kbps)" },
+                      { id: "very_high" as const, label: "Very High (256 kbps)" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          if (!recordDownload(track.id)) {
+                            toast.error("Download limit reached for today");
+                            setDownloadOpen(false);
+                            return;
+                          }
+                          if (track.audioUrl) {
+                            let targetAudioUrl = track.audioUrl;
+                            if (track.audioVariants) {
+                              const variantKey =
+                                opt.id === "data_saver"
+                                  ? "download_96k"
+                                  : opt.id === "very_high"
+                                    ? "download_256k"
+                                    : "download_160k";
+                              if (track.audioVariants[variantKey]?.url) {
+                                targetAudioUrl = track.audioVariants[variantKey].url;
+                              }
+                            }
+                            const ext = "m4a";
+                            const fileName = buildTrackDownloadFilename(track.title, artist?.displayName, track.features, ext);
+                            const downloadUrl = new URL(targetAudioUrl, window.location.origin);
+                            downloadUrl.searchParams.set("filename", fileName);
+                            downloadUrl.searchParams.set("quality", opt.id);
+                            downloadUrl.searchParams.set("download", "1");
+
+                            const a = document.createElement("a");
+                            a.href = downloadUrl.toString();
+                            a.download = fileName;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }
+                          setDownloadOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium text-foreground hover:bg-elevated hover:text-primary transition-colors cursor-pointer"
+                      >
+                        <span>{opt.label}</span>
+                        <Download size={12} className="opacity-60" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
 
               <Button
                 variant="outline"

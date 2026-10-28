@@ -15,6 +15,7 @@ import {
   Facebook,
   MessageCircle,
   Download,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -254,24 +255,31 @@ export function TrackRow({
     userTrackPlays,
     recordDownload,
     showAuthPrompt,
+    settings,
   } = usePlugg();
   const router = useRouter();
   const isCurrent = currentTrack?.id === track.id;
   const artist = artists.find((a) => a.id === track.artistId);
   const liked = isLiked(track.id);
   const [menuView, setMenuView] = useState<"closed" | "main" | "playlists" | "new-playlist">("closed");
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
   useEffect(() => {
     if (menuView === "closed") {
       setNewPlaylistName("");
+      setDownloadOpen(false);
       return;
     }
-    const close = () => setMenuView("closed");
+    const close = () => {
+      setMenuView("closed");
+      setDownloadOpen(false);
+    };
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [menuView]);
+
 
   return (
     <div
@@ -435,35 +443,81 @@ export function TrackRow({
                     <Share2 size={16} className="text-muted-foreground" />
                     Share
                   </button>
-                  <button
-                    onClick={() => {
-                      if (!recordDownload(track.id)) {
-                        setMenuView("closed");
-                        return;
-                      }
-                      if (track.audioUrl) {
-                        const urlPath = track.audioUrl.split("?")[0] ?? "";
-                        const urlExt = urlPath.split(".").pop()?.toLowerCase();
-                        const ext = urlExt && ["mp3", "wav", "flac", "aac", "ogg", "m4a"].includes(urlExt) ? urlExt : "mp3";
-                        const fileName = buildTrackDownloadFilename(track.title, artist?.displayName, track.features, ext);
-                        
-                        const downloadUrl = new URL(track.audioUrl, window.location.origin);
-                        downloadUrl.searchParams.set("filename", fileName);
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDownloadOpen((prev) => !prev);
+                      }}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-elevated text-foreground transition-colors cursor-pointer"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Download size={16} className="text-muted-foreground" />
+                        Download
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className={cn("text-muted-foreground transition-transform duration-200", downloadOpen && "rotate-180")}
+                      />
+                    </button>
 
-                        const a = document.createElement("a");
-                        a.href = downloadUrl.toString();
-                        a.download = fileName;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                      }
-                      setMenuView("closed");
-                    }}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-elevated text-foreground"
-                  >
-                    <Download size={16} className="text-muted-foreground" />
-                    Download
-                  </button>
+                    {downloadOpen && (
+                      <div className="my-1 mx-1 space-y-0.5 rounded-lg border border-border/60 bg-elevated/70 p-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        {[
+                          { id: "data_saver" as const, label: "Data Saver (96 kbps)" },
+                          { id: "standard" as const, label: "Standard (160 kbps)" },
+                          { id: "very_high" as const, label: "Very High (256 kbps)" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!recordDownload(track.id)) {
+                                setMenuView("closed");
+                                return;
+                              }
+                              if (track.audioUrl) {
+                                let targetAudioUrl = track.audioUrl;
+                                if (track.audioVariants) {
+                                  const variantKey =
+                                    opt.id === "data_saver"
+                                      ? "download_96k"
+                                      : opt.id === "very_high"
+                                        ? "download_256k"
+                                        : "download_160k";
+                                  if (track.audioVariants[variantKey]?.url) {
+                                    targetAudioUrl = track.audioVariants[variantKey].url;
+                                  }
+                                }
+                                const ext = "m4a";
+                                const fileName = buildTrackDownloadFilename(track.title, artist?.displayName, track.features, ext);
+                                const downloadUrl = new URL(targetAudioUrl, window.location.origin);
+                                downloadUrl.searchParams.set("filename", fileName);
+                                downloadUrl.searchParams.set("quality", opt.id);
+                                downloadUrl.searchParams.set("download", "1");
+
+                                const a = document.createElement("a");
+                                a.href = downloadUrl.toString();
+                                a.download = fileName;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                              }
+                              setDownloadOpen(false);
+                              setMenuView("closed");
+                            }}
+                            className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer"
+                          >
+                            <span>{opt.label}</span>
+                            <Download size={12} className="opacity-60" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </>
               )}
 

@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import sql from "@/lib/db";
 import { getUserFromSession } from "@/lib/auth";
-import type { Artist, Genre, Playlist, Release, Track, Analytics, User } from "@/data/types";
+import type { Artist, Genre, Playlist, Release, Track, Analytics, User, ReleaseStatus } from "@/data/types";
 import { fallbackAnalytics } from "@/data/analytics";
-import { goLiveAt } from "@/lib/plugg";
+import { goLiveAt, todayISO } from "@/lib/plugg";
 import { tracks as seedTracks } from "@/data/tracks";
 import { artists as seedArtists } from "@/data/artists";
 import { releases as seedReleases } from "@/data/releases";
@@ -110,11 +110,17 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
       features: string | null;
       producers: string | null;
       lyrics: string | null;
+      audioProcessingStatus: "pending" | "processing" | "completed" | "failed" | null;
+      technicalValidation: any;
+      audioVariants: any;
     }[]
   >`
     SELECT id, plugg_track_id, artist_id, release_id, title, slug, genre, cover_url, audio_url, 
            duration_seconds, play_count, COALESCE(download_count, 0) as download_count,
-           COALESCE(like_count, 0) as like_count, published, release_date, features, producers, lyrics 
+           COALESCE(like_count, 0) as like_count, published, release_date, features, producers, lyrics,
+           COALESCE(audio_processing_status, 'completed') as "audioProcessingStatus",
+           COALESCE(technical_validation, '{}'::jsonb) as "technicalValidation",
+           COALESCE(audio_variants, '{}'::jsonb) as "audioVariants"
     FROM tracks
     ORDER BY created_at ASC
   `;
@@ -141,6 +147,9 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     features: t.features || undefined,
     producers: t.producers || undefined,
     lyrics: t.lyrics || undefined,
+    audioProcessingStatus: t.audioProcessingStatus || "completed",
+    technicalValidation: t.technicalValidation && Object.keys(t.technicalValidation).length > 0 ? t.technicalValidation : undefined,
+    audioVariants: t.audioVariants && Object.keys(t.audioVariants).length > 0 ? t.audioVariants : undefined,
   }));
 
   // Fetch release track ordering
@@ -156,7 +165,7 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     releaseTrackMap.set(link.releaseId, list);
   }
 
-  // Auto-sync status for scheduled releases that have reached their go_live_at
+  // Auto-sync status for scheduled releases that have reached their go_live_at (Kampala midnight)
   try {
     await sql`
       UPDATE releases
@@ -184,13 +193,27 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
       type: "single" | "EP" | "album";
       coverUrl: string;
       releaseDate: Date | string;
-      status: "published" | "scheduled" | "draft";
+      status: ReleaseStatus;
       goLiveAt: Date | string | null;
       description: string | null;
       label: string | null;
+      reviewSubmittedAt: Date | string | null;
+      reviewedAt: Date | string | null;
+      reviewerId: string | null;
+      reviewFeedback: string | null;
+      audioProcessingStatus: "pending" | "processing" | "completed" | "failed" | null;
+      technicalValidation: any;
+      reviewHistory: any;
     }[]
   >`
-    SELECT id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at, description, label 
+    SELECT id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at, description, label,
+           review_submitted_at as "reviewSubmittedAt",
+           reviewed_at as "reviewedAt",
+           reviewer_id as "reviewerId",
+           review_feedback as "reviewFeedback",
+           COALESCE(audio_processing_status, 'completed') as "audioProcessingStatus",
+           COALESCE(technical_validation, '{}'::jsonb) as "technicalValidation",
+           COALESCE(review_history, '[]'::jsonb) as "reviewHistory"
     FROM releases
     ORDER BY release_date DESC
   `;
@@ -220,6 +243,21 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
         : undefined,
       description: r.description || undefined,
       label: r.label || undefined,
+      reviewSubmittedAt: r.reviewSubmittedAt
+        ? r.reviewSubmittedAt instanceof Date
+          ? r.reviewSubmittedAt.toISOString()
+          : String(r.reviewSubmittedAt)
+        : undefined,
+      reviewedAt: r.reviewedAt
+        ? r.reviewedAt instanceof Date
+          ? r.reviewedAt.toISOString()
+          : String(r.reviewedAt)
+        : undefined,
+      reviewerId: r.reviewerId || undefined,
+      reviewFeedback: r.reviewFeedback || undefined,
+      audioProcessingStatus: r.audioProcessingStatus || "completed",
+      technicalValidation: r.technicalValidation && Object.keys(r.technicalValidation).length > 0 ? r.technicalValidation : undefined,
+      reviewHistory: Array.isArray(r.reviewHistory) ? r.reviewHistory : undefined,
     };
   });
 
@@ -709,7 +747,7 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         label?: string | undefined;
         releaseDate: string;
         goLiveAt?: string | undefined;
-        status?: "published" | "scheduled" | "draft" | undefined;
+        status?: ReleaseStatus | undefined;
       };
       songs: {
         title: string;
@@ -737,13 +775,31 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     const goLive = release.goLiveAt
       ? new Date(release.goLiveAt)
       : new Date(goLiveAt(release.releaseDate));
-    const isScheduled = !isNaN(goLive.getTime()) ? goLive.getTime() > Date.now() : false;
-    const finalStatus: "published" | "scheduled" | "draft" =
-      release.status || (isScheduled ? "scheduled" : "published");
+
+    // New submissions enter processing -> under_review workflow unless explicitly saved as draft
+    const isDraft = release.status === "draft";
+    const initialStatus: ReleaseStatus = isDraft ? "draft" : "under_review";
+    const initialProcessingStatus = isDraft ? "completed" : "processing";
+    const reviewHistory = isDraft
+      ? []
+      : [
+          {
+            id: crypto.randomUUID(),
+            action: "submitted" as const,
+            timestamp: new Date().toISOString(),
+            actorId: user.id,
+            actorName: user.name,
+          },
+        ];
+
+    const createdTrackJobs: { trackId: string; audioUrl: string | null }[] = [];
 
     await sql.begin(async (tx) => {
       await tx`
-        INSERT INTO releases (id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at, description, label, is_mock)
+        INSERT INTO releases (
+          id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at,
+          description, label, review_submitted_at, audio_processing_status, review_history, is_mock
+        )
         VALUES (
           ${releaseId},
           ${user.artistId!},
@@ -752,10 +808,13 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           ${release.type},
           ${release.coverUrl || ""},
           ${release.releaseDate},
-          ${finalStatus},
+          ${initialStatus},
           ${!isNaN(goLive.getTime()) ? goLive : null},
           ${release.description || null},
           ${release.label || null},
+          ${isDraft ? null : sql`now()`},
+          ${initialProcessingStatus},
+          ${JSON.stringify(reviewHistory)},
           false
         )
       `;
@@ -779,7 +838,8 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         await tx`
           INSERT INTO tracks (
             id, plugg_track_id, artist_id, release_id, title, slug, genre, cover_url, audio_url,
-            duration_seconds, play_count, published, release_date, features, producers, lyrics, is_mock
+            duration_seconds, play_count, published, release_date, features, producers, lyrics,
+            audio_processing_status, is_mock
           )
           VALUES (
             ${trackId},
@@ -793,11 +853,12 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
             ${song.audioUrl || null},
             ${song.durationSeconds || 0},
             0,
-            ${!isScheduled},
+            false,
             ${release.releaseDate},
             ${song.features || null},
             ${song.producers || null},
             ${song.lyrics || null},
+            ${initialProcessingStatus},
             false
           )
         `;
@@ -806,10 +867,287 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           INSERT INTO release_tracks (release_id, track_id, position)
           VALUES (${releaseId}, ${trackId}, ${i})
         `;
+
+        createdTrackJobs.push({ trackId, audioUrl: song.audioUrl || null });
       }
     });
 
-    return { success: true, releaseId };
+    // Run audio variant generation in background / async for real audio files
+    if (!isDraft && createdTrackJobs.length > 0) {
+      (async () => {
+        try {
+          const { processMasterAudio } = await import("@/server/audio-processor");
+          let allSuccess = true;
+          for (const job of createdTrackJobs) {
+            if (!job.audioUrl) continue;
+            const cleanKey = decodeURIComponent(
+              job.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, "")
+            );
+            const res = await processMasterAudio(cleanKey, job.trackId);
+            if (!res.success) allSuccess = false;
+          }
+          await sql`
+            UPDATE releases
+            SET
+              status = ${allSuccess ? "under_review" : "processing"},
+              audio_processing_status = ${allSuccess ? "completed" : "failed"},
+              updated_at = now()
+            WHERE id = ${releaseId}
+          `;
+        } catch (procErr) {
+          console.error("Background variant processing error for release:", releaseId, procErr);
+          await sql`
+            UPDATE releases
+            SET audio_processing_status = 'failed', updated_at = now()
+            WHERE id = ${releaseId}
+          `;
+        }
+      })();
+    }
+
+    return { success: true, releaseId, status: initialStatus };
+  });
+
+export const approveReleaseFn = createServerFn({ method: "POST" })
+  .validator(
+    (data: { releaseId: string; newReleaseDate?: string | undefined }) => data
+  )
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    if (!user) throw new Error("Authentication required");
+    const isSystemAdmin =
+      Boolean(user.isAdmin) ||
+      user.email === "zuri@plugg.fm" ||
+      user.email === "admin@plugg.fm" ||
+      user.email === "xsm@plugg.com";
+    if (!isSystemAdmin) {
+      throw new Error("Unauthorized: Administrator permissions required to approve tracks");
+    }
+
+    const { releaseId, newReleaseDate } = data;
+    const [release] = await sql<
+      {
+        id: string;
+        artistId: string;
+        title: string;
+        status: string;
+        releaseDate: string | Date;
+        goLiveAt: string | Date | null;
+        audioProcessingStatus: string;
+        reviewHistory: any;
+      }[]
+    >`
+      SELECT id, artist_id as "artistId", title, status, release_date as "releaseDate",
+             go_live_at as "goLiveAt", audio_processing_status as "audioProcessingStatus",
+             review_history as "reviewHistory"
+      FROM releases
+      WHERE id = ${releaseId}
+      LIMIT 1
+    `;
+    if (!release) throw new Error("Release not found");
+
+    if (release.audioProcessingStatus !== "completed") {
+      throw new Error("Cannot approve track while audio variants are still processing or failed.");
+    }
+
+    const currentKampalaToday = todayISO();
+    const existingReleaseDate =
+      release.releaseDate instanceof Date
+        ? release.releaseDate.toISOString().slice(0, 10)
+        : String(release.releaseDate || "");
+
+    let targetReleaseDate = existingReleaseDate;
+    let targetGoLive = release.goLiveAt
+      ? release.goLiveAt instanceof Date
+        ? release.goLiveAt
+        : new Date(release.goLiveAt)
+      : null;
+
+    // Check if the originally scheduled release date/time has already elapsed
+    const hasElapsed = targetGoLive
+      ? targetGoLive.getTime() <= Date.now()
+      : existingReleaseDate < currentKampalaToday;
+
+    if (hasElapsed) {
+      if (!newReleaseDate) {
+        throw new Error(
+          "The originally scheduled release date has elapsed while under review. A new valid future release date is required."
+        );
+      }
+      targetReleaseDate = newReleaseDate;
+      targetGoLive = new Date(goLiveAt(newReleaseDate));
+    } else if (newReleaseDate) {
+      targetReleaseDate = newReleaseDate;
+      targetGoLive = new Date(goLiveAt(newReleaseDate));
+    } else if (!targetGoLive) {
+      targetGoLive = new Date(goLiveAt(targetReleaseDate));
+    }
+
+    const history = Array.isArray(release.reviewHistory) ? release.reviewHistory : [];
+    history.push({
+      id: crypto.randomUUID(),
+      action: "approved",
+      timestamp: new Date().toISOString(),
+      actorId: user.id,
+      actorName: user.name,
+    });
+
+    await sql`
+      UPDATE releases
+      SET
+        status = 'scheduled',
+        release_date = ${targetReleaseDate},
+        go_live_at = ${targetGoLive},
+        reviewed_at = now(),
+        reviewer_id = ${user.id},
+        review_history = ${JSON.stringify(history)},
+        updated_at = now()
+      WHERE id = ${releaseId}
+    `;
+
+    return {
+      success: true,
+      releaseId,
+      status: "scheduled",
+      releaseDate: targetReleaseDate,
+      goLiveAt: targetGoLive.toISOString(),
+    };
+  });
+
+export const requestChangesReleaseFn = createServerFn({ method: "POST" })
+  .validator((data: { releaseId: string; feedback: string }) => data)
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    if (!user) throw new Error("Authentication required");
+    const isSystemAdmin =
+      Boolean(user.isAdmin) ||
+      user.email === "zuri@plugg.fm" ||
+      user.email === "admin@plugg.fm" ||
+      user.email === "xsm@plugg.com";
+    if (!isSystemAdmin) {
+      throw new Error("Unauthorized: Administrator permissions required to request changes");
+    }
+
+    const { releaseId, feedback } = data;
+    if (!feedback || !feedback.trim()) {
+      throw new Error("Written feedback explaining required changes is mandatory.");
+    }
+
+    const [release] = await sql<
+      { id: string; artistId: string; title: string; reviewHistory: any }[]
+    >`
+      SELECT id, artist_id as "artistId", title, review_history as "reviewHistory"
+      FROM releases
+      WHERE id = ${releaseId}
+      LIMIT 1
+    `;
+    if (!release) throw new Error("Release not found");
+
+    const history = Array.isArray(release.reviewHistory) ? release.reviewHistory : [];
+    history.push({
+      id: crypto.randomUUID(),
+      action: "changes_requested",
+      timestamp: new Date().toISOString(),
+      actorId: user.id,
+      actorName: user.name,
+      feedback: feedback.trim(),
+    });
+
+    await sql`
+      UPDATE releases
+      SET
+        status = 'changes_required',
+        review_feedback = ${feedback.trim()},
+        reviewed_at = now(),
+        reviewer_id = ${user.id},
+        review_history = ${JSON.stringify(history)},
+        updated_at = now()
+      WHERE id = ${releaseId}
+    `;
+
+    return {
+      success: true,
+      releaseId,
+      status: "changes_required",
+      feedback: feedback.trim(),
+    };
+  });
+
+export const resubmitReleaseFn = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      releaseId: string;
+      releaseDate?: string | undefined;
+      notes?: string | undefined;
+    }) => data
+  )
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    if (!user || user.accountType !== "artist" || !user.artistId) {
+      throw new Error("Unauthorized: Artist account required");
+    }
+
+    const { releaseId, releaseDate, notes } = data;
+    const [release] = await sql<
+      { id: string; artistId: string; reviewHistory: any; releaseDate: any }[]
+    >`
+      SELECT id, artist_id as "artistId", review_history as "reviewHistory", release_date as "releaseDate"
+      FROM releases
+      WHERE id = ${releaseId} AND artist_id = ${user.artistId}
+      LIMIT 1
+    `;
+    if (!release) throw new Error("Release not found or not owned by artist");
+
+    const targetDate =
+      releaseDate ||
+      (release.releaseDate instanceof Date
+        ? release.releaseDate.toISOString().slice(0, 10)
+        : String(release.releaseDate));
+    const targetGoLive = new Date(goLiveAt(targetDate));
+
+    const history = Array.isArray(release.reviewHistory) ? release.reviewHistory : [];
+    history.push({
+      id: crypto.randomUUID(),
+      action: "resubmitted",
+      timestamp: new Date().toISOString(),
+      actorId: user.id,
+      actorName: user.name,
+      feedback: notes || "Corrections applied and resubmitted by artist.",
+    });
+
+    await sql`
+      UPDATE releases
+      SET
+        status = 'under_review',
+        release_date = ${targetDate},
+        go_live_at = ${targetGoLive},
+        review_submitted_at = now(),
+        review_history = ${JSON.stringify(history)},
+        updated_at = now()
+      WHERE id = ${releaseId}
+    `;
+
+    return { success: true, releaseId, status: "under_review" };
+  });
+
+export const retryTrackProcessingFn = createServerFn({ method: "POST" })
+  .validator((data: { trackId: string }) => data)
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    if (!user) throw new Error("Authentication required");
+
+    const { trackId } = data;
+    const [track] = await sql<{ id: string; audioUrl: string | null; releaseId: string }[]>`
+      SELECT id, audio_url as "audioUrl", release_id as "releaseId" FROM tracks WHERE id = ${trackId} LIMIT 1
+    `;
+    if (!track || !track.audioUrl) throw new Error("Track or audio file not found");
+
+    const { processMasterAudio } = await import("@/server/audio-processor");
+    const storageKey = decodeURIComponent(
+      track.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, "")
+    );
+    const result = await processMasterAudio(storageKey, track.id);
+    return result;
   });
 
 export const updateReleaseFn = createServerFn({ method: "POST" })

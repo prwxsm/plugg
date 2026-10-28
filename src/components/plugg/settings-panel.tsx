@@ -65,7 +65,7 @@ function Toggle({
 }
 
 export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } = {}) {
-  const { session, currentUser, currentArtist, signOut, deleteAccount, settings, updateSettings } = usePlugg();
+  const { session, currentUser, currentArtist, signOut, deleteAccount, settings, updateSettings, networkQuality } = usePlugg();
   const isArtist = session === "loggedInArtist" || currentUser?.accountType === "artist";
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -190,65 +190,89 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
             }}
           />
 
-          <div>
-            <Toggle
-              label="Crossfade"
-              hint="Blend the last seconds of one song into the next."
-              checked={settings.crossfade}
-              onCheckedChange={(val) => {
-                updateSettings({ crossfade: val });
-                toast.success(
-                  val
-                    ? `Crossfade enabled (${settings.crossfadeSeconds}s smooth blend)`
-                    : "Crossfade disabled",
-                );
-              }}
-            />
-            {settings.crossfade && (
-              <div className="pb-4 pt-1 px-1 space-y-2 text-xs text-muted-foreground animate-in fade-in duration-200">
-                <div className="flex items-center justify-between font-medium">
-                  <span>Crossfade transition length</span>
-                  <span className="font-mono text-foreground font-semibold">
-                    {settings.crossfadeSeconds} seconds
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={2}
-                  max={12}
-                  step={1}
-                  value={settings.crossfadeSeconds}
-                  onChange={(e) => {
-                    const sec = Number(e.target.value);
-                    updateSettings({ crossfadeSeconds: sec });
-                  }}
-                  className="w-full accent-primary h-1.5 bg-elevated rounded-lg cursor-pointer"
-                  aria-label="Crossfade duration in seconds"
-                />
-                <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>2s (subtle)</span>
-                  <span>6s</span>
-                  <span>12s (long blend)</span>
-                </div>
-              </div>
-            )}
-          </div>
-
           <Toggle
-            label="High quality streaming"
-            hint="Stream high fidelity 320 kbps audio with intelligent pre-buffering."
-            checked={settings.highQualityStreaming}
+            label="Crossfade"
+            hint="Smooth 5-second blend between songs."
+            checked={settings.crossfade}
             onCheckedChange={(val) => {
-              updateSettings({ highQualityStreaming: val });
+              updateSettings({ crossfade: val, crossfadeSeconds: 5 });
               toast.success(
-                val
-                  ? "High quality streaming enabled (320 kbps audio)"
-                  : "Standard audio streaming active",
+                val ? "Crossfade enabled (5s smooth blend)" : "Crossfade disabled",
               );
             }}
           />
+
+          {/* Streaming Quality: Adaptive vs Data Saver */}
+          <div className="py-2 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Streaming audio quality</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {settings.streamingQuality === "data_saver"
+                  ? "Data Saver active (reduced data usage for metered connections)"
+                  : "Adaptive streaming (automatically optimizes playback quality)"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span
+                className={cn(
+                  "text-xs font-medium cursor-pointer transition-colors",
+                  settings.streamingQuality !== "data_saver"
+                    ? "text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => {
+                  updateSettings({ streamingQuality: "auto" });
+                  toast.success("Streaming set to Adaptive");
+                }}
+              >
+                Adaptive
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.streamingQuality === "data_saver"}
+                onClick={() => {
+                  const isSaver = settings.streamingQuality === "data_saver";
+                  const next = isSaver ? "auto" : "data_saver";
+                  updateSettings({
+                    streamingQuality: next,
+                    highQualityStreaming: next === "auto",
+                  });
+                  toast.success(next === "data_saver" ? "Data Saver enabled" : "Adaptive streaming enabled");
+                }}
+                className={cn(
+                  "h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer",
+                  settings.streamingQuality === "data_saver" ? "bg-primary" : "bg-elevated"
+                )}
+              >
+                <span
+                  className={cn(
+                    "block h-5 w-5 rounded-full transition-transform duration-200",
+                    settings.streamingQuality === "data_saver"
+                      ? "translate-x-5 bg-background shadow-xs"
+                      : "translate-x-0 bg-white shadow-xs"
+                  )}
+                />
+              </button>
+              <span
+                className={cn(
+                  "text-xs font-medium cursor-pointer transition-colors",
+                  settings.streamingQuality === "data_saver"
+                    ? "text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => {
+                  updateSettings({ streamingQuality: "data_saver", highQualityStreaming: false });
+                  toast.success("Streaming set to Data Saver");
+                }}
+              >
+                Data Saver
+              </span>
+            </div>
+          </div>
         </div>
       </section>
+
 
       <section className="surface-card p-5 sm:p-6">
         <p className="text-eyebrow">Notifications</p>

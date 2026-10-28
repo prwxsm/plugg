@@ -58,8 +58,8 @@ export async function getUserFromSession(): Promise<User | null> {
       return null;
     }
 
-    const [user] = await sql<User[]>`
-      SELECT u.id, u.name, u.username, u.email, u.account_type as "accountType", u.avatar_url as "avatarUrl", u.artist_id as "artistId"
+    const [user] = await sql<(User & { isAdmin?: boolean })[]>`
+      SELECT u.id, u.name, u.username, u.email, u.account_type as "accountType", u.avatar_url as "avatarUrl", u.artist_id as "artistId", COALESCE(u.is_admin, false) as "isAdmin"
       FROM sessions s
       JOIN users u ON u.id = s.user_id
       WHERE s.id = ${sessionId} AND s.expires_at > now()
@@ -73,6 +73,8 @@ export async function getUserFromSession(): Promise<User | null> {
       return null;
     }
 
+    const isSystemAdmin = Boolean(user.isAdmin) || user.email === "zuri@plugg.fm" || user.email === "admin@plugg.fm" || user.email === "xsm@plugg.com";
+
     return {
       id: user.id,
       name: user.name,
@@ -81,6 +83,7 @@ export async function getUserFromSession(): Promise<User | null> {
       accountType: user.accountType,
       avatarUrl: user.avatarUrl || "",
       artistId: user.artistId || undefined,
+      isAdmin: isSystemAdmin,
     };
   } catch (err) {
     console.error("Error retrieving user from session:", err);

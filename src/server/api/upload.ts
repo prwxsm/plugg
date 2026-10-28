@@ -26,6 +26,25 @@ export async function handleUploadRequest(request: Request): Promise<Response> {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    let technicalValidation = null;
+    if (category === "audio") {
+      const { inspectAudioHeader } = await import("@/lib/audio-validation");
+      const validation = inspectAudioHeader(buffer);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({
+            error: validation.error || "Audio file does not meet Plugg master requirements",
+            validation: validation.properties,
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      technicalValidation = validation.properties;
+    }
+
     // Sanitize filename
     const cleanFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueSuffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
@@ -65,6 +84,7 @@ export async function handleUploadRequest(request: Request): Promise<Response> {
         filename: file.name,
         size: file.size,
         mimeType: file.type,
+        technicalValidation,
       }),
       {
         status: 200,

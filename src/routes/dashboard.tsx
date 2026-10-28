@@ -18,6 +18,15 @@ import {
   Disc3,
   FileText,
   Hash,
+  AlertCircle,
+  CheckCircle2,
+  Play,
+  Pause,
+  RotateCcw,
+  History,
+  Sparkles,
+  ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import {
   Area,
@@ -40,11 +49,14 @@ import {
   inputClass,
 } from "@/components/plugg/primitives";
 import { art } from "@/data/covers";
-import { formatCount, formatDate, formatDateTime, formatDuration, goLiveAt } from "@/lib/plugg";
+import type { Release } from "@/data/types";
+import { formatCount, formatDate, formatDateTime, formatDuration, goLiveAt, todayISO } from "@/lib/plugg";
+import { PluggDatePicker } from "@/components/plugg/date-picker";
 import { usePlugg } from "@/state/plugg-store";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-type DashboardTab = "overview" | "releases";
+type DashboardTab = "overview" | "releases" | "review_queue";
 
 type SongFilter =
   | "streams"
@@ -169,6 +181,7 @@ export const Route = createFileRoute("/dashboard")({
   validateSearch: (search: Record<string, unknown>): { tab?: DashboardTab } => {
     const t = search["tab"];
     if (t === "releases" || t === "scheduled") return { tab: "releases" };
+    if (t === "review_queue") return { tab: "review_queue" };
     return {};
   },
   head: () => ({
@@ -190,7 +203,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
-  const { session, currentArtist, analytics, tracks, releases } = usePlugg();
+  const { session, currentUser, currentArtist, analytics, tracks, releases } = usePlugg();
   const { tab = "overview" } = Route.useSearch();
   const navigate = useNavigate();
 
@@ -275,6 +288,8 @@ function Dashboard() {
 
   const displayedTracks = showAllTracks ? sortedTracks : sortedTracks.slice(0, 10);
   const myReleases = releases.filter((r) => r.artistId === currentArtist.id);
+  const pendingReviewCount = releases.filter((r) => r.status === "under_review").length;
+  const isAdmin = Boolean(currentUser?.isAdmin || currentUser?.email?.includes("admin") || currentUser?.email?.includes("plugg.fm"));
 
   const tabs: { value: DashboardTab; label: string }[] = [
     { value: "overview", label: "Overview" },
@@ -282,7 +297,12 @@ function Dashboard() {
       value: "releases",
       label: `Your Releases${myReleases.length ? ` (${myReleases.length})` : ""}`,
     },
+    {
+      value: "review_queue" as DashboardTab,
+      label: `Review Queue${pendingReviewCount > 0 ? ` (${pendingReviewCount})` : ""}`,
+    },
   ];
+
 
   return (
     <div className="space-y-6 sm:space-y-10 pt-14 md:pt-0">
@@ -303,7 +323,12 @@ function Dashboard() {
             onClick={() =>
               navigate({
                 to: "/dashboard",
-                search: t.value === "releases" ? { tab: "releases" } : {},
+                search:
+                  t.value === "releases"
+                    ? { tab: "releases" }
+                    : t.value === "review_queue"
+                      ? { tab: "review_queue" }
+                      : {},
               })
             }
             className={cn(
@@ -319,6 +344,7 @@ function Dashboard() {
       </div>
 
       {tab === "releases" ? <YourReleasesTab /> : null}
+      {tab === "review_queue" ? <AdminReviewQueueTab /> : null}
 
       {tab === "overview" ? (
         <>
@@ -534,13 +560,18 @@ function Dashboard() {
   );
 }
 function YourReleasesTab() {
-  const { currentArtist, releases, tracks, deleteRelease, uploadDraft, analytics } = usePlugg();
+  const { currentArtist, releases, tracks, deleteRelease, uploadDraft, analytics, resubmitRelease } = usePlugg();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "scheduled" | "draft">(
-    "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "under_review" | "changes_required" | "scheduled" | "published" | "draft"
+  >("all");
+
+  const [resubmitTarget, setResubmitTarget] = useState<Release | null>(null);
+  const [resubmitNotes, setResubmitNotes] = useState("");
+  const [resubmitDate, setResubmitDate] = useState("");
+  const [isResubmitting, setIsResubmitting] = useState(false);
 
   useEffect(() => {
     if (!activeMenuId) return;
@@ -561,6 +592,8 @@ function YourReleasesTab() {
   if (!currentArtist) return null;
 
   const myReleases = releases.filter((r) => r.artistId === currentArtist.id);
+  const underReviewCount = myReleases.filter((r) => r.status === "under_review").length;
+  const changesRequiredCount = myReleases.filter((r) => r.status === "changes_required").length;
   const scheduledCount = myReleases.filter((r) => r.status === "scheduled").length;
   const publishedCount = myReleases.filter((r) => r.status === "published").length;
   const draftCount = myReleases.filter((r) => r.status === "draft").length;
@@ -570,14 +603,32 @@ function YourReleasesTab() {
     return r.status === statusFilter;
   });
 
+  // Requirement 4 & 6: Position "Under Review" explicitly before "Scheduled"
   const filterOptions = [
     { id: "all" as const, label: `All (${myReleases.length})`, icon: Layers },
+    { id: "under_review" as const, label: `Under Review (${underReviewCount})`, icon: Clock },
+    ...(changesRequiredCount > 0
+      ? [{ id: "changes_required" as const, label: `Changes Required (${changesRequiredCount})`, icon: AlertCircle }]
+      : []),
+    { id: "scheduled" as const, label: `Scheduled (${scheduledCount})`, icon: Calendar },
     { id: "published" as const, label: `Published (${publishedCount})`, icon: Disc3 },
-    { id: "scheduled" as const, label: `Scheduled (${scheduledCount})`, icon: Clock },
     ...(draftCount > 0
       ? [{ id: "draft" as const, label: `Drafts (${draftCount})`, icon: FileText }]
       : []),
   ];
+
+  const handleConfirmResubmit = async () => {
+    if (!resubmitTarget) return;
+    setIsResubmitting(true);
+    try {
+      await resubmitRelease(resubmitTarget.id, resubmitDate || resubmitTarget.releaseDate, resubmitNotes);
+      setResubmitTarget(null);
+      setResubmitNotes("");
+      setResubmitDate("");
+    } finally {
+      setIsResubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -603,7 +654,7 @@ function YourReleasesTab() {
 
       <section className="space-y-4">
         <div className="space-y-3">
-          <SectionHeader title="Your releases" subtitle="Published, scheduled and drafts" />
+          <SectionHeader title="Your releases" subtitle="Review status, scheduled launches, and published music" />
           {myReleases.length > 0 && (
             <div>
               <FilterDropdown
@@ -624,8 +675,8 @@ function YourReleasesTab() {
           />
         ) : filteredReleases.length === 0 ? (
           <EmptyState
-            title={`No ${statusFilter} releases`}
-            description={`You have no releases with status "${statusFilter}".`}
+            title={`No ${statusFilter.replace("_", " ")} releases`}
+            description={`You have no releases with status "${statusFilter.replace("_", " ")}".`}
           />
         ) : (
           <div className="track-list">
@@ -633,6 +684,8 @@ function YourReleasesTab() {
               const performance = analytics.releasePerformance.find(
                 (p) => p.releaseId === release.id,
               );
+              const isUnderReview = release.status === "under_review";
+              const isChangesRequired = release.status === "changes_required";
               const isScheduled = release.status === "scheduled";
               const isDraft = release.status === "draft";
               const isPublished = release.status === "published";
@@ -640,7 +693,7 @@ function YourReleasesTab() {
               const menuOpen = activeMenuId === release.id;
 
               return (
-                <div key={release.id} className="p-4 border-b border-border/40 last:border-b-0">
+                <div key={release.id} className="p-4 border-b border-border/40 last:border-b-0 space-y-3">
                   <div className="flex items-center gap-4">
                     <img
                       src={art(release.coverUrl)}
@@ -683,17 +736,30 @@ function YourReleasesTab() {
                       <span className="truncate">{formatCount(performance?.plays ?? 0)}</span>
                     </span>
 
+                    {/* Status Badge */}
                     <span
                       className={cn(
-                        "inline-flex items-center justify-center w-[88px] shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium capitalize text-center",
+                        "inline-flex items-center justify-center min-w-[92px] shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium text-center border",
                         isPublished
-                          ? "bg-primary/15 text-primary"
+                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
                           : isScheduled
-                            ? "bg-elevated text-foreground"
-                            : "bg-muted text-muted-foreground",
+                            ? "bg-blue-500/15 text-blue-400 border-blue-500/20"
+                            : isUnderReview
+                              ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/20"
+                              : isChangesRequired
+                                ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
+                                : "bg-muted text-muted-foreground border-border/60",
                       )}
                     >
-                      {release.status}
+                      {isUnderReview
+                        ? "Under review"
+                        : isChangesRequired
+                          ? "Changes needed"
+                          : isScheduled
+                            ? "Scheduled"
+                            : isPublished
+                              ? "Published"
+                              : "Draft"}
                     </span>
 
                     <div className="relative shrink-0 flex items-center gap-2">
@@ -727,8 +793,22 @@ function YourReleasesTab() {
                         {menuOpen ? (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-2xl animate-scale-in"
+                            className="absolute right-0 z-50 mt-1.5 w-48 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-2xl animate-scale-in"
                           >
+                            {isChangesRequired ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setResubmitTarget(release);
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-amber-400 hover:bg-amber-500/10 transition-colors font-medium"
+                              >
+                                <RotateCcw size={14} />
+                                Update &amp; Resubmit
+                              </button>
+                            ) : null}
+
                             {isScheduled ? (
                               <button
                                 type="button"
@@ -782,6 +862,43 @@ function YourReleasesTab() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Under Review Notice for Artists (< 24h duration info) */}
+                  {isUnderReview && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-2.5 text-xs text-indigo-300">
+                      <Clock size={13} className="shrink-0 text-indigo-400" />
+                      <span className="font-medium text-foreground">Under Review by Curation Team</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">
+                        Submitted {release.reviewSubmittedAt ? formatDateTime(release.reviewSubmittedAt) : "recently"}
+                      </span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-indigo-200">Reviews normally complete in less than 24 hours</span>
+                    </div>
+                  )}
+
+                  {/* Changes Required Notice & Action */}
+                  {isChangesRequired && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-200 space-y-2">
+                      <div className="flex items-center gap-2 font-semibold text-amber-400">
+                        <AlertCircle size={14} className="shrink-0" />
+                        <span>Reviewer Feedback — Changes Needed</span>
+                      </div>
+                      <p className="text-amber-100 leading-relaxed whitespace-pre-wrap">{release.reviewFeedback}</p>
+                      <div className="pt-1 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setResubmitTarget(release)}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 text-black px-3.5 py-1.5 text-xs font-semibold hover:bg-amber-300 transition-colors shadow-xs"
+                        >
+                          <RotateCcw size={13} />
+                          Update &amp; Resubmit
+                        </button>
+                        <span className="text-[11px] text-amber-300/80">Correct details and return to review</span>
+                      </div>
+                    </div>
+                  )}
+
                   {open ? <ScheduledEditor releaseId={release.id} /> : null}
                 </div>
               );
@@ -789,6 +906,88 @@ function YourReleasesTab() {
           </div>
         )}
       </section>
+
+      {/* Resubmit Modal for Artist */}
+      {resubmitTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          onClick={() => setResubmitTarget(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-foreground">
+                Resubmit for Review: {resubmitTarget.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setResubmitTarget(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-elevated"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {resubmitTarget.reviewFeedback && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                <p className="font-semibold text-amber-400">Previous Reviewer Feedback:</p>
+                <p className="mt-1 leading-relaxed text-amber-100">{resubmitTarget.reviewFeedback}</p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Scheduled Release Date</label>
+              <input
+                type="date"
+                min={todayISO()}
+                value={resubmitDate || resubmitTarget.releaseDate}
+                onChange={(e) => setResubmitDate(e.target.value)}
+                className={inputClass}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Publishes at midnight Africa/Kampala (UTC+03:00) on this date once approved.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Notes for Reviewer (Optional)</label>
+              <textarea
+                rows={3}
+                value={resubmitNotes}
+                onChange={(e) => setResubmitNotes(e.target.value)}
+                placeholder="Describe what you updated or corrected…"
+                className={cn(inputClass, "resize-none h-20 text-xs")}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setResubmitTarget(null)}
+                className="rounded-full text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                disabled={isResubmitting}
+                onClick={handleConfirmResubmit}
+                className="rounded-full bg-primary text-primary-foreground font-semibold text-xs px-4"
+              >
+                {isResubmitting ? (
+                  <>
+                    <Loader2 size={13} className="mr-1.5 animate-spin" /> Submitting…
+                  </>
+                ) : (
+                  "Resubmit for Review"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Custom Confirmation Card Modal */}
       {deleteTarget ? (
@@ -798,47 +997,32 @@ function YourReleasesTab() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-sm rounded-2xl bg-surface p-5 shadow-2xl animate-in zoom-in-95 duration-150 space-y-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-dialog-title"
+            className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl space-y-4"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
-                <Trash2 size={20} />
-              </div>
-              <div className="space-y-1">
-                <h3 id="delete-dialog-title" className="text-base font-semibold text-foreground">
-                  Delete project?
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Are you sure you want to delete{" "}
-                  <span className="font-medium text-foreground">"{deleteTarget.title}"</span>? This
-                  project will be permanently removed.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-1">
-              <button
-                type="button"
+            <h3 className="text-base font-semibold text-foreground">Delete this release?</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Are you sure you want to delete <strong className="text-foreground">"{deleteTarget.title}"</strong>?
+              This action cannot be undone and will permanently remove all associated tracks.
+            </p>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <Button
+                variant="outline"
                 onClick={() => setDeleteTarget(null)}
-                className="rounded-xl bg-elevated px-4 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
+                className="rounded-full text-xs"
               >
                 Cancel
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="subtle"
                 onClick={() => {
-                  const targetId = deleteTarget.id;
+                  deleteRelease(deleteTarget.id);
                   setDeleteTarget(null);
-                  if (editingId === targetId) setEditingId(null);
-                  deleteRelease(targetId);
+                  toast.success("Release deleted");
                 }}
-                className="rounded-xl bg-destructive px-4 py-2 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-sm"
+                className="rounded-full text-xs px-4 bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Delete project
-              </button>
+                Delete Release
+              </Button>
             </div>
           </div>
         </div>
@@ -846,6 +1030,495 @@ function YourReleasesTab() {
     </div>
   );
 }
+
+function AdminReviewQueueTab() {
+  const {
+    releases,
+    tracks,
+    artists,
+    approveRelease,
+    requestChangesRelease,
+    retryTrackProcessing,
+    playTrack,
+    currentTrack,
+    isPlaying,
+    togglePlay,
+  } = usePlugg();
+
+  const [activeFeedbackModalRelease, setActiveFeedbackModalRelease] = useState<Release | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+  const [dateModalRelease, setDateModalRelease] = useState<Release | null>(null);
+  const [adjustedReleaseDate, setAdjustedReleaseDate] = useState("");
+  const [isApprovingDate, setIsApprovingDate] = useState(false);
+
+  const pendingReleases = useMemo(() => {
+    return releases
+      .filter((r) => r.status === "under_review")
+      .sort((a, b) => {
+        const timeA = new Date(a.reviewSubmittedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.reviewSubmittedAt || b.createdAt || 0).getTime();
+        return timeA - timeB; // Oldest submissions first!
+      });
+  }, [releases]);
+
+  const handleApproveClick = (rel: Release) => {
+    const liveTime = new Date(goLiveAt(rel.releaseDate)).getTime();
+    if (liveTime <= Date.now()) {
+      // Date has passed! Require a new valid future release date
+      setAdjustedReleaseDate(todayISO());
+      setDateModalRelease(rel);
+      return;
+    }
+    approveRelease(rel.id);
+  };
+
+  const confirmApprovalWithNewDate = async () => {
+    if (!dateModalRelease) return;
+    const liveTime = new Date(goLiveAt(adjustedReleaseDate)).getTime();
+    if (liveTime <= Date.now()) {
+      toast.error("Please choose a future release date for midnight publication");
+      return;
+    }
+    setIsApprovingDate(true);
+    try {
+      await approveRelease(dateModalRelease.id, adjustedReleaseDate);
+      setDateModalRelease(null);
+    } finally {
+      setIsApprovingDate(false);
+    }
+  };
+
+  const handleConfirmRequestChanges = async () => {
+    if (!activeFeedbackModalRelease || !feedbackText.trim()) {
+      toast.error("Please provide written feedback explaining the required changes");
+      return;
+    }
+    setIsSubmittingFeedback(true);
+    try {
+      await requestChangesRelease(activeFeedbackModalRelease.id, feedbackText.trim());
+      setActiveFeedbackModalRelease(null);
+      setFeedbackText("");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-1">
+        <SectionHeader
+          title="Administrator Review Queue"
+          subtitle="Prioritize pending submissions, review audio masters & technical specs, and approve or request changes (< 24h SLA)"
+        />
+      </div>
+
+      {pendingReleases.length === 0 ? (
+        <EmptyState
+          title="Review queue is clear"
+          description="All uploaded artist submissions have been reviewed and approved or updated."
+          icon={<ShieldCheck size={28} className="text-emerald-400" />}
+        />
+      ) : (
+        <div className="space-y-4">
+          {pendingReleases.map((release) => {
+            const relTracks = tracks.filter((t) => t.releaseId === release.id);
+            const artist = artists.find((a) => a.id === release.artistId);
+
+            const submittedAt = release.reviewSubmittedAt || release.createdAt || new Date().toISOString();
+            const diffHours = (Date.now() - new Date(submittedAt).getTime()) / (1000 * 60 * 60);
+            const isBreached = diffHours >= 24;
+            const isWarning = diffHours >= 18 && diffHours < 24;
+
+            const originalDatePassed = new Date(goLiveAt(release.releaseDate)).getTime() <= Date.now();
+
+            const isProcessing =
+              release.audioProcessingStatus === "processing" ||
+              relTracks.some((t) => t.audioProcessingStatus === "processing");
+
+            return (
+              <div
+                key={release.id}
+                className={cn(
+                  "surface-card rounded-2xl p-5 sm:p-6 border transition-all duration-200 space-y-5",
+                  isBreached
+                    ? "border-destructive/60 bg-destructive/[0.03] ring-1 ring-destructive/30"
+                    : isWarning
+                      ? "border-amber-500/60 bg-amber-500/[0.02] ring-1 ring-amber-500/20"
+                      : "border-border/70"
+                )}
+              >
+                {/* Header: Title, Artist, SLA indicator */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <img
+                      src={art(release.coverUrl)}
+                      alt={release.title}
+                      className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover ring-1 ring-white/10 shrink-0 shadow-md"
+                    />
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-base sm:text-lg text-foreground truncate">
+                          {release.title}
+                        </span>
+                        <span className="rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wide">
+                          {release.type}
+                        </span>
+                        <span className="rounded-full bg-elevated text-muted-foreground text-[10px] font-medium px-2 py-0.5">
+                          {relTracks[0]?.genre || "Music"}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm font-medium text-foreground/80">
+                        Artist: <span className="text-foreground">{artist?.displayName || "Unknown Artist"}</span>
+                        {release.label ? (
+                          <span className="text-muted-foreground"> · Label: {release.label}</span>
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Release date:{" "}
+                        <strong className={originalDatePassed ? "text-amber-400 font-semibold" : "text-foreground font-semibold"}>
+                          {formatDate(release.releaseDate)}
+                        </strong>{" "}
+                        (Midnight Kampala UTC+03:00)
+                        {originalDatePassed ? (
+                          <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-[10px] font-semibold">
+                            Date Passed
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* SLA Badge */}
+                  <div className="flex flex-col sm:items-end gap-1 shrink-0">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold shadow-xs",
+                        isBreached
+                          ? "bg-destructive text-destructive-foreground animate-pulse"
+                          : isWarning
+                            ? "bg-amber-500 text-black font-bold"
+                            : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                      )}
+                    >
+                      <Clock size={12} strokeWidth={2.5} />
+                      {isBreached
+                        ? `Exceeds 24h SLA (${Math.floor(diffHours)}h pending)`
+                        : isWarning
+                          ? `Approaching 24h SLA (${Math.floor(diffHours)}h pending)`
+                          : `${Math.floor(diffHours)}h pending (< 24h SLA)`}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Submitted {formatDateTime(submittedAt)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Track Details & Audio Inspection */}
+                <div className="rounded-xl border border-border/60 bg-surface/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <span>Tracks in submission ({relTracks.length})</span>
+                    <span>Technical specs &amp; variants</span>
+                  </div>
+
+                  <div className="divide-y divide-border/40">
+                    {relTracks.map((tr, idx) => {
+                      const isThisPlaying = isPlaying && currentTrack?.id === tr.id;
+                      const val = tr.technicalValidation;
+                      const variants = tr.audioVariants;
+                      const hasVariants = Boolean(variants && Object.keys(variants).length > 0);
+
+                      return (
+                        <div key={tr.id} className="py-3 first:pt-0 last:pb-0 space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isThisPlaying) {
+                                    togglePlay();
+                                  } else {
+                                    playTrack(tr.id);
+                                  }
+                                }}
+                                className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer"
+                                title={isThisPlaying ? "Pause audio" : "Listen to track master"}
+                              >
+                                {isThisPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+                              </button>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {idx + 1}. {tr.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDuration(tr.durationSeconds)}
+                                  {tr.features ? ` · feat. ${tr.features}` : ""}
+                                  {tr.producers ? ` · prod. ${tr.producers}` : ""}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Tech Badges */}
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                              {val?.format && (
+                                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground uppercase">
+                                  {val.format}
+                                </span>
+                              )}
+                              {val?.sampleRate && (
+                                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                  {val.sampleRate / 1000} kHz
+                                </span>
+                              )}
+                              {val?.bitDepth && (
+                                <span
+                                  className={cn(
+                                    "rounded-md px-2 py-0.5 font-mono text-[10px] font-medium",
+                                    val.bitDepth >= 24
+                                      ? "bg-primary/20 text-primary font-semibold"
+                                      : "bg-secondary text-muted-foreground"
+                                  )}
+                                >
+                                  {val.bitDepth}-bit {val.bitDepth >= 24 ? "Master" : ""}
+                                </span>
+                              )}
+                              {val?.channels && (
+                                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                  {val.channels >= 2 ? "Stereo" : "Mono"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Variants Info */}
+                          <div className="flex items-center justify-between text-[11px] text-muted-foreground pl-11">
+                            <div className="flex items-center gap-2">
+                              <span>Audio Pipeline:</span>
+                              {tr.audioProcessingStatus === "completed" || hasVariants ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                                  <CheckCircle2 size={11} /> 4 streaming (Opus/AAC) + 3 download (AAC) ready
+                                </span>
+                              ) : tr.audioProcessingStatus === "failed" ? (
+                                <span className="inline-flex items-center gap-1 text-destructive font-medium">
+                                  <AlertCircle size={11} /> Failed
+                                  <button
+                                    onClick={() => retryTrackProcessing(tr.id)}
+                                    className="ml-2 underline text-primary hover:text-primary/80"
+                                  >
+                                    Retry
+                                  </button>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-amber-300 font-medium">
+                                  <Loader2 size={11} className="animate-spin" /> Transcoding in background…
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Review History if any */}
+                {release.reviewHistory && release.reviewHistory.length > 0 && (
+                  <div className="rounded-xl border border-border/40 bg-surface/30 p-3 space-y-2 text-xs">
+                    <p className="font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <History size={12} /> Review History ({release.reviewHistory.length} previous review
+                      {release.reviewHistory.length > 1 ? "s" : ""})
+                    </p>
+                    <div className="space-y-1.5 pl-3 border-l-2 border-border/60">
+                      {release.reviewHistory.map((h, i) => (
+                        <div key={i} className="space-y-0.5 text-[11px]">
+                          <span className="font-mono text-muted-foreground">
+                            {formatDateTime(h.date)} · <strong className="capitalize text-foreground">{h.action.replace("_", " ")}</strong>
+                          </span>
+                          {h.feedback && <p className="text-amber-200/90 italic">"{h.feedback}"</p>}
+                          {h.notes && <p className="text-foreground/80">Artist notes: "{h.notes}"</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions: Approve / Request Changes */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/40">
+                  <div className="text-xs text-muted-foreground">
+                    {originalDatePassed ? (
+                      <span className="text-amber-400 font-medium">
+                        Notice: Original release date has elapsed. Approving will prompt for a valid future midnight date.
+                      </span>
+                    ) : (
+                      <span>Will publish automatically at midnight Uganda time on {formatDate(release.releaseDate)}.</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setFeedbackText("");
+                        setActiveFeedbackModalRelease(release);
+                      }}
+                      className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500 text-xs px-4 h-9 rounded-full"
+                    >
+                      <AlertCircle size={13} className="mr-1.5" />
+                      Request Changes
+                    </Button>
+
+                    <Button
+                      variant="primary"
+                      disabled={isProcessing}
+                      onClick={() => handleApproveClick(release)}
+                      className="bg-emerald-500 text-black hover:bg-emerald-400 font-semibold text-xs px-5 h-9 rounded-full shadow-xs cursor-pointer"
+                    >
+                      <Check size={13} strokeWidth={3} className="mr-1.5" />
+                      Approve Release
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Request Changes Modal */}
+      {activeFeedbackModalRelease && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          onClick={() => setActiveFeedbackModalRelease(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-foreground">
+                Request Changes: {activeFeedbackModalRelease.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveFeedbackModalRelease(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-elevated"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Provide clear, constructive feedback to the artist explaining what needs correction before approval
+              (e.g., audio mix or master issues, inaccurate metadata, miscredited features, or artwork clarity).
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Written Feedback (Required)</label>
+              <textarea
+                rows={4}
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Explain the required corrections in detail…"
+                className={cn(inputClass, "resize-none h-28 text-xs")}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setActiveFeedbackModalRelease(null)}
+                className="rounded-full text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!feedbackText.trim() || isSubmittingFeedback}
+                onClick={handleConfirmRequestChanges}
+                className="rounded-full bg-amber-500 text-black hover:bg-amber-400 font-semibold text-xs px-4"
+              >
+                {isSubmittingFeedback ? (
+                  <>
+                    <Loader2 size={13} className="mr-1.5 animate-spin" /> Submitting…
+                  </>
+                ) : (
+                  "Send Feedback to Artist"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Adjust Date for Approval Modal (when original date elapsed) */}
+      {dateModalRelease && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          onClick={() => setDateModalRelease(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-foreground">Select New Release Date</h3>
+              <button
+                type="button"
+                onClick={() => setDateModalRelease(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-elevated"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The originally selected release date (<strong>{formatDate(dateModalRelease.releaseDate)}</strong>) has
+              already passed. To prevent accidental retroactive releases, please select a valid future release date.
+              The track will publish at midnight Kampala time (UTC+03:00) on the chosen date.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">New Release Date</label>
+              <input
+                type="date"
+                min={todayISO()}
+                value={adjustedReleaseDate}
+                onChange={(e) => setAdjustedReleaseDate(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setDateModalRelease(null)}
+                className="rounded-full text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!adjustedReleaseDate || isApprovingDate}
+                onClick={confirmApprovalWithNewDate}
+                className="rounded-full bg-emerald-500 text-black hover:bg-emerald-400 font-semibold text-xs px-4"
+              >
+                {isApprovingDate ? (
+                  <>
+                    <Loader2 size={13} className="mr-1.5 animate-spin" /> Approving…
+                  </>
+                ) : (
+                  "Approve for Scheduled Date"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function CollaboratorField({
   label,

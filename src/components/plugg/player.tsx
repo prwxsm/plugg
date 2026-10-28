@@ -687,22 +687,33 @@ export function FullPlayer() {
         <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/90 to-background" />
       </div>
 
-      <div className="relative mx-auto flex min-h-full w-full max-w-7xl flex-col justify-between px-5 py-4 sm:px-10 lg:px-14 pb-16 md:pb-4">
-        {/* Top Header Bar: Clean collapse button, Plugg branding, Like button */}
-        <header className="flex shrink-0 items-center justify-between py-3 sm:py-4">
+      {/* Mobile Full-Bleed Hero Cover Art: Covers top, left, right borders and fades at name/controls */}
+      <div className="lg:hidden absolute top-0 inset-x-0 h-[60vh] min-h-[400px] max-h-[580px] pointer-events-none overflow-hidden z-0">
+        <img
+          src={art(currentTrack.coverUrl)}
+          alt={`${currentTrack.title} cover art`}
+          className="h-full w-full object-cover object-center"
+        />
+        {/* Gradient fade: clear at the top, vibrant center, fade right where title and controls are */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent 45% via-background/70 80% to-background 100%" />
+      </div>
+
+      {/* Top Header Bar: Transparent floating container with static/sticky liquidmorphic buttons */}
+      <header className="sticky top-0 z-30 w-full shrink-0 pointer-events-none bg-transparent">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between md:justify-center px-4 py-3 sm:px-10 sm:py-4 lg:px-14">
           <button
             type="button"
             onClick={() => setFullPlayerOpen(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface/60 hover:bg-surface text-muted-foreground hover:text-foreground transition-colors shadow-xs"
+            className="md:hidden flex h-10 w-10 items-center justify-center rounded-full bg-background/50 hover:bg-background/70 backdrop-blur-xl text-foreground/90 hover:text-foreground transition-all shadow-md active:scale-95 pointer-events-auto"
             title="Collapse player"
             aria-label="Collapse player"
           >
-            <ChevronDown size={22} />
+            <ChevronDown size={20} />
           </button>
 
-          <div className="flex items-center gap-2.5">
-            <img src={logoImg} alt="Plugg" className="h-7 w-7 sm:h-8 sm:w-8 object-contain drop-shadow" />
-            <span className="font-display text-base sm:text-lg font-bold tracking-wide text-foreground">
+          <div className="flex items-center gap-2 font-display text-sm sm:text-base font-bold tracking-tight pointer-events-auto bg-background/50 px-3.5 py-1.5 rounded-full backdrop-blur-xl text-foreground shadow-md transition-colors">
+            <img src={logoImg} alt="Plugg" className="h-6 w-6 sm:h-7 sm:w-7 object-contain" />
+            <span>
               plugg<span className="text-muted-foreground">.</span>
             </span>
           </div>
@@ -711,63 +722,104 @@ export function FullPlayer() {
             type="button"
             onClick={() => toggleLike(currentTrack.id)}
             className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-full bg-surface/60 hover:bg-surface transition-colors shadow-xs",
-              isLiked(currentTrack.id) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              "md:hidden flex h-10 w-10 items-center justify-center rounded-full bg-background/50 hover:bg-background/70 backdrop-blur-xl transition-all shadow-md active:scale-95 pointer-events-auto",
+              isLiked(currentTrack.id) ? "text-primary" : "text-foreground/90 hover:text-foreground"
             )}
             title={isLiked(currentTrack.id) ? "Unlike song" : "Like song"}
             aria-label={isLiked(currentTrack.id) ? "Unlike song" : "Like song"}
           >
             <Heart size={18} className={isLiked(currentTrack.id) ? "fill-current text-primary" : ""} />
           </button>
-        </header>
+        </div>
+      </header>
 
-        {/* Main Content Area: 45% Artwork (Left) / 55% Information (Right) */}
-        <div className="my-auto grid w-full flex-1 grid-cols-1 items-center gap-8 py-2 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)] lg:gap-14">
-          {/* Left Column: Visual Identity (Artwork, Title, Artist) + Mobile Playback Controls */}
-          <div className="flex min-w-0 flex-col items-center lg:items-start justify-center">
-            <div className="relative aspect-square w-full max-w-[320px] sm:max-w-[420px] overflow-hidden rounded-2xl shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)] group transition-all duration-300">
-              <img
-                src={art(currentTrack.coverUrl)}
-                alt={`${currentTrack.title} cover art`}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
+      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-5 sm:px-10 lg:px-14 md:pb-4">
+        {/* Main Content Area: Desktop side-by-side / Mobile 2-screen scrollable layout */}
+        <div className="w-full flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)] lg:gap-14 lg:items-center lg:my-auto">
+          {/* Left Column (Desktop) / Screen 1 (Mobile): Artwork, Title, Controls at footer */}
+          <div className="flex min-w-0 flex-col justify-between min-h-[calc(100dvh-56px)] lg:min-h-0 lg:justify-center items-center lg:items-start py-2 lg:py-0">
+            {/* Desktop Artwork & Track Title */}
+            <div className="hidden lg:flex w-full flex-col items-start">
+              <div className="relative aspect-square w-full max-w-[320px] sm:max-w-[420px] overflow-hidden rounded-2xl shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)] group transition-all duration-300">
+                <img
+                  src={art(currentTrack.coverUrl)}
+                  alt={`${currentTrack.title} cover art`}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              </div>
+
+              <div className="mt-5 w-full max-w-[340px] sm:max-w-[420px] text-left">
+                <div className="flex items-center justify-start gap-2">
+                  <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl drop-shadow" title={currentTrack.title}>
+                    {currentTrack.title}
+                  </h1>
+                  {settings.highQualityStreaming && (
+                    <span
+                      title="High Quality Audio (320 kbps)"
+                      className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-primary"
+                    >
+                      HQ
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center justify-start gap-2 text-sm text-muted-foreground">
+                  {artist ? (
+                    <Link
+                      to="/artist/$username"
+                      params={{ username: artist.username }}
+                      onClick={() => setFullPlayerOpen(false)}
+                      className="font-medium text-foreground/90 hover:text-foreground hover:underline transition-colors"
+                    >
+                      {artist.displayName}
+                    </Link>
+                  ) : null}
+                  {currentTrack.features ? (
+                    <span className="text-muted-foreground/75 truncate">
+                      · feat. {currentTrack.features}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
             </div>
 
-            <div className="mt-5 w-full max-w-[320px] sm:max-w-[420px] text-center lg:text-left">
-              <div className="flex items-center justify-center lg:justify-start gap-2">
-                <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl" title={currentTrack.title}>
-                  {currentTrack.title}
-                </h1>
-                {settings.highQualityStreaming && (
-                  <span
-                    title="High Quality Audio (320 kbps)"
-                    className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-primary"
-                  >
-                    HQ
-                  </span>
-                )}
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center justify-center lg:justify-start gap-2 text-sm text-muted-foreground">
-                {artist ? (
-                  <Link
-                    to="/artist/$username"
-                    params={{ username: artist.username }}
-                    onClick={() => setFullPlayerOpen(false)}
-                    className="font-medium text-foreground/90 hover:text-foreground hover:underline transition-colors"
-                  >
-                    {artist.displayName}
-                  </Link>
-                ) : null}
-                {currentTrack.features ? (
-                  <span className="text-muted-foreground/75 truncate">
-                    · feat. {currentTrack.features}
-                  </span>
-                ) : null}
-              </div>
-            </div>
+            {/* Mobile Spacer: Flexible space so full-bleed hero cover art is prominently visible */}
+            <div className="lg:hidden flex-1 w-full min-h-[30vh]" aria-hidden="true" />
 
-            {/* Mobile Playback Controls: Scrubber & Control Buttons */}
-            <div className="mt-6 w-full max-w-[320px] sm:max-w-[420px] space-y-4 lg:hidden">
+            {/* Mobile Playback Controls & Track Info: Positioned together at footer of screen */}
+            <div className="w-full max-w-[340px] sm:max-w-[420px] space-y-4 pb-6 pt-2 lg:hidden">
+              {/* Mobile Track Title & Artist - adjusted downwards directly above player */}
+              <div className="w-full text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl drop-shadow" title={currentTrack.title}>
+                    {currentTrack.title}
+                  </h1>
+                  {settings.highQualityStreaming && (
+                    <span
+                      title="High Quality Audio (320 kbps)"
+                      className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-primary"
+                    >
+                      HQ
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+                  {artist ? (
+                    <Link
+                      to="/artist/$username"
+                      params={{ username: artist.username }}
+                      onClick={() => setFullPlayerOpen(false)}
+                      className="font-medium text-foreground/90 hover:text-foreground hover:underline transition-colors"
+                    >
+                      {artist.displayName}
+                    </Link>
+                  ) : null}
+                  {currentTrack.features ? (
+                    <span className="text-muted-foreground/75 truncate">
+                      · feat. {currentTrack.features}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Scrubber className="w-full" />
                 <div className="flex justify-between text-xs tabular-nums text-muted-foreground px-0.5">
@@ -825,8 +877,8 @@ export function FullPlayer() {
             </div>
           </div>
 
-          {/* Right Column: Information Layer (Lyrics | About | Credits) */}
-          <div className="flex w-full min-w-0 flex-col justify-center">
+          {/* Right Column (Desktop) / Screen 2 (Mobile, revealed on scroll): Lyrics, About, Credits */}
+          <div className="flex w-full min-w-0 flex-col justify-center pt-8 pb-20 lg:py-0">
             {/* Tabs Header */}
             <div className="flex items-center gap-8 border-b border-border/40 pb-3 justify-center lg:justify-start">
               {(["lyrics", "about", "credits"] as const).map((tab) => {

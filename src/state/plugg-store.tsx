@@ -32,6 +32,10 @@ import {
   updateTrackFn,
   deleteReleaseFn,
   recordTrackDownloadFn,
+  approveReleaseFn,
+  requestChangesReleaseFn,
+  resubmitReleaseFn,
+  retryTrackProcessingFn,
 } from "@/server-fns/data-functions";
 import { logoutUser, updateUserProfileFn, deleteUserAccountFn } from "@/server-fns/auth-functions";
 import { useAuthPrompt } from "@/components/plugg/auth-prompt-modal";
@@ -40,10 +44,15 @@ import { toast } from "sonner";
 export type SessionState = "loggedOut" | "loggedInListener" | "loggedInArtist";
 export type RepeatMode = "off" | "one" | "all";
 
+export type StreamingQuality = "auto" | "data_saver" | "normal" | "high" | "very_high";
+export type DownloadQuality = "data_saver" | "standard" | "very_high";
+
 export interface UserSettings {
   autoplaySimilar: boolean;
   crossfade: boolean;
   crossfadeSeconds: number;
+  streamingQuality: StreamingQuality;
+  downloadQuality: DownloadQuality;
   highQualityStreaming: boolean;
   notifyNewReleases: boolean;
   notifyWeeklyDigest: boolean;
@@ -52,7 +61,9 @@ export interface UserSettings {
 export const defaultUserSettings: UserSettings = {
   autoplaySimilar: true,
   crossfade: false,
-  crossfadeSeconds: 4,
+  crossfadeSeconds: 5,
+  streamingQuality: "auto",
+  downloadQuality: "standard",
   highQualityStreaming: true,
   notifyNewReleases: true,
   notifyWeeklyDigest: false,
@@ -217,6 +228,11 @@ interface PluggContextValue {
   uploadDraft: UploadDraft | null;
   saveUploadDraft: (draft: UploadDraft) => void;
   clearUploadDraft: () => void;
+  // review workflow
+  approveRelease: (releaseId: string, newReleaseDate?: string) => Promise<void>;
+  requestChangesRelease: (releaseId: string, feedback: string) => Promise<void>;
+  resubmitRelease: (releaseId: string, releaseDate?: string, notes?: string) => Promise<void>;
+  retryTrackProcessing: (trackId: string) => Promise<void>;
   // notifications
   notifications: PluggNotification[];
   clearNotification: (id: string) => void;
@@ -225,6 +241,7 @@ interface PluggContextValue {
   // settings
   settings: UserSettings;
   updateSettings: (patch: Partial<UserSettings>) => void;
+  networkQuality: "data_saver" | "normal" | "high" | "very_high";
   // player
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -246,6 +263,66 @@ interface PluggContextValue {
   cycleRepeat: () => void;
   setFullPlayerOpen: (open: boolean) => void;
   clearPlayer: () => void;
+}
+
+export function detectNetworkAdaptiveQuality(): "data_saver" | "normal" | "high" | "very_high" {
+  if (typeof navigator === "undefined" || !("connection" in navigator)) {
+    return "high";
+  }
+  const conn = (navigator as any).connection;
+  if (!conn) return "high";
+
+  // Prioritize data efficiency on mobile/cellular or saveData
+  if (conn.saveData || conn.type === "cellular") {
+    if (conn.effectiveType === "slow-2g" || conn.effectiveType === "2g") {
+      return "data_saver";
+    }
+    return "normal";
+  }
+
+  if (conn.effectiveType === "slow-2g" || conn.effectiveType === "2g") {
+    return "data_saver";
+  }
+  if (conn.effectiveType === "3g") {
+    return "normal";
+  }
+  return "very_high";
+}
+
+export function getEffectiveStreamingUrl(
+  track: Track,
+  quality: StreamingQuality,
+  adaptiveQuality: "data_saver" | "normal" | "high" | "very_high"
+): string {
+  if (!track.audioUrl) return "";
+  const resolvedQuality = quality === "auto" ? adaptiveQuality : quality;
+
+  // If track has specific audioVariants mapped, use direct variant if available
+  if (track.audioVariants) {
+    const variantKey =
+      resolvedQuality === "data_saver"
+        ? "stream_64k"
+        : resolvedQuality === "normal"
+          ? "stream_96k"
+          : resolvedQuality === "high"
+            ? "stream_160k"
+            : "stream_256k";
+    if (track.audioVariants[variantKey]?.url) {
+      return track.audioVariants[variantKey].url;
+    }
+  }
+
+  // Otherwise, route through /api/stream with quality query parameter
+  if (track.audioUrl.startsWith("/api/stream/")) {
+    const url = new URL(
+      track.audioUrl,
+      typeof window !== "undefined" ? window.location.origin : "http://localhost"
+    );
+    url.searchParams.set("quality", resolvedQuality);
+    return url.pathname + url.search;
+  }
+
+  return track.audioUrl;
 }
 
 const PluggContext = createContext<PluggContextValue | null>(null);
@@ -336,6 +413,27 @@ export function PluggProvider({
     }
     return defaultUserSettings;
   });
+
+  const [networkQuality, setNetworkQuality] = useState<"data_saver" | "normal" | "high" | "very_high">(
+    () => detectNetworkAdaptiveQuality()
+  );
+  const networkQualityRef = useRef(networkQuality);
+  networkQualityRef.current = networkQuality;
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("connection" in navigator)) return;
+    const conn = (navigator as any).connection;
+    if (!conn) return;
+    const updateNetwork = () => {
+      const q = detectNetworkAdaptiveQuality();
+      setNetworkQuality(q);
+      networkQualityRef.current = q;
+    };
+    conn.addEventListener?.("change", updateNetwork);
+    return () => {
+      conn.removeEventListener?.("change", updateNetwork);
+    };
+  }, []);
 
   const updateSettings = useCallback((patch: Partial<UserSettings>) => {
     setSettings((prev) => {
@@ -559,12 +657,43 @@ export function PluggProvider({
     };
   }, []);
 
+  // Seamlessly adjust playback quality when setting or network changes without interruption
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentTrackRef.current) return;
+    const effUrl = getEffectiveStreamingUrl(
+      currentTrackRef.current,
+      settings.streamingQuality,
+      networkQuality
+    );
+    if (!effUrl) return;
+
+    // Check if the current audio.src already matches the target URL or quality query
+    const currentSrc = audio.src;
+    if (currentSrc === effUrl || currentSrc.endsWith(effUrl)) return;
+
+    // Preserve playback position and playing state
+    const currentTime = audio.currentTime;
+    const wasPlaying = !audio.paused;
+
+    audio.src = effUrl;
+    audio.currentTime = currentTime;
+    if (wasPlaying) {
+      audio.play().catch(() => {});
+    }
+  }, [settings.streamingQuality, networkQuality]);
+
   // Update audio preloading when high quality streaming setting changes
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.preload = settings.highQualityStreaming ? "auto" : "metadata";
+      audioRef.current.preload =
+        settings.streamingQuality === "high" ||
+        settings.streamingQuality === "very_high" ||
+        settings.highQualityStreaming
+          ? "auto"
+          : "metadata";
     }
-  }, [settings.highQualityStreaming]);
+  }, [settings.streamingQuality, settings.highQualityStreaming]);
 
   // Restore volume immediately if crossfade is turned off while playing
   useEffect(() => {
@@ -602,9 +731,14 @@ export function PluggProvider({
       const target = tracks.find((t) => t.id === trackId);
       setActiveDuration(target?.durationSeconds ?? 0);
       const audio = audioRef.current;
-      if (audio && target?.audioUrl) {
-        if (audio.src !== target.audioUrl) {
-          audio.src = target.audioUrl;
+      if (audio && target) {
+        const streamUrl = getEffectiveStreamingUrl(
+          target,
+          settingsRef.current.streamingQuality,
+          networkQualityRef.current
+        );
+        if (streamUrl && audio.src !== streamUrl) {
+          audio.src = streamUrl;
         }
         audio.currentTime = 0;
 
@@ -1085,8 +1219,8 @@ export function PluggProvider({
       const list = songs.length > 0 ? songs : [{ ...emptySongDraft(), title: input.title }];
 
       const goLiveTime = goLiveAt(input.releaseDate);
-      const isScheduled = new Date(goLiveTime).getTime() > Date.now();
-      const releaseStatus: Release["status"] = isScheduled ? "scheduled" : "published";
+      const releaseStatus: Release["status"] = "under_review";
+      const reviewSubmittedAt = new Date().toISOString();
 
       const newTracks: Track[] = list.map((song, index) => ({
         id: `${releaseId}-t${index + 1}`,
@@ -1099,11 +1233,12 @@ export function PluggProvider({
         audioUrl: song.audioUrl || null,
         durationSeconds: song.durationSeconds > 0 ? song.durationSeconds : 180 + index * 17,
         playCount: 0,
-        published: !isScheduled,
+        published: false,
         releaseDate: input.releaseDate,
         features: song.features,
         producers: song.producers,
         lyrics: song.lyrics,
+        audioProcessingStatus: "completed",
       }));
 
       const release: Release = {
@@ -1118,8 +1253,11 @@ export function PluggProvider({
         goLiveAt: goLiveTime,
         description: input.description,
         label: input.label,
+        reviewSubmittedAt,
+        audioProcessingStatus: "completed",
         trackIds: newTracks.map((t) => t.id),
       };
+
 
       setTracks((prev) => [...newTracks, ...prev]);
       setReleases((prev) => [release, ...prev]);
@@ -1175,12 +1313,92 @@ export function PluggProvider({
     uploadDraft,
     saveUploadDraft: setUploadDraft,
     clearUploadDraft: () => setUploadDraft(null),
+    // review workflow
+    approveRelease: async (releaseId: string, newReleaseDate?: string | undefined) => {
+      try {
+        await approveReleaseFn({ data: { releaseId, newReleaseDate } });
+        setReleases((prev) =>
+          prev.map((r) =>
+            r.id === releaseId
+              ? {
+                  ...r,
+                  status: "scheduled",
+                  releaseDate: newReleaseDate || r.releaseDate,
+                  reviewedAt: new Date().toISOString(),
+                  reviewFeedback: undefined,
+                }
+              : r
+          )
+        );
+        toast.success("Track approved and moved to Scheduled!");
+      } catch (err: any) {
+        toast.error(err.message || "Failed to approve release");
+        throw err;
+      }
+    },
+    requestChangesRelease: async (releaseId: string, feedback: string) => {
+      try {
+        await requestChangesReleaseFn({ data: { releaseId, feedback } });
+        setReleases((prev) =>
+          prev.map((r) =>
+            r.id === releaseId
+              ? {
+                  ...r,
+                  status: "changes_required",
+                  reviewedAt: new Date().toISOString(),
+                  reviewFeedback: feedback,
+                }
+              : r
+          )
+        );
+        toast.info("Changes requested from artist.");
+      } catch (err: any) {
+        toast.error(err.message || "Failed to request changes");
+        throw err;
+      }
+    },
+    resubmitRelease: async (releaseId: string, releaseDate?: string | undefined, notes?: string | undefined) => {
+      try {
+        await resubmitReleaseFn({ data: { releaseId, releaseDate, notes } });
+        setReleases((prev) =>
+          prev.map((r) =>
+            r.id === releaseId
+              ? {
+                  ...r,
+                  status: "under_review",
+                  reviewSubmittedAt: new Date().toISOString(),
+                  releaseDate: releaseDate || r.releaseDate,
+                }
+              : r
+          )
+        );
+        toast.success("Track resubmitted for review!");
+      } catch (err: any) {
+        toast.error(err.message || "Failed to resubmit release");
+        throw err;
+      }
+    },
+    retryTrackProcessing: async (trackId: string) => {
+      try {
+        const res = await retryTrackProcessingFn({ data: { trackId } });
+        if (!res.success) {
+          toast.error(res.error || "Failed to process audio");
+          return;
+        }
+        toast.info("Audio processing restarted.");
+      } catch (err: any) {
+        toast.error(err.message || "Failed to retry audio processing");
+        throw err;
+      }
+    },
+
     notifications,
     clearNotification,
     clearAllNotifications,
     restoreDefaultNotifications,
     settings,
     updateSettings,
+    networkQuality,
     currentTrack,
     isPlaying,
     progress,

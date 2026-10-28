@@ -19,20 +19,42 @@ export function formatDate(iso: string): string {
 }
 
 export function todayISO(): string {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Kampala",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return formatter.format(new Date());
+  } catch {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+  }
 }
 
 /**
- * Everything goes live at midnight: a release dated today appears at 00:00 the
- * next day, a future date appears at 00:00 on that day.
+ * Uganda midnight publishing: Everything goes live at midnight in Africa/Kampala (UTC+03:00).
+ * A release dated today or in the past appears at 00:00 Africa/Kampala the next day;
+ * a future date appears at 00:00 Africa/Kampala on that day.
  */
 export function goLiveAt(releaseDate: string): string {
-  const base = new Date(`${releaseDate}T00:00:00`);
-  if (Number.isNaN(base.getTime())) return new Date().toISOString();
-  if (releaseDate <= todayISO()) base.setDate(base.getDate() + 1);
-  return base.toISOString();
+  const today = todayISO();
+  let targetDate = releaseDate;
+  if (releaseDate <= today) {
+    const d = new Date(`${today}T12:00:00+03:00`);
+    d.setDate(d.getDate() + 1);
+    targetDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Kampala",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  }
+  const kampalaMidnight = new Date(`${targetDate}T00:00:00+03:00`);
+  if (Number.isNaN(kampalaMidnight.getTime())) return new Date().toISOString();
+  return kampalaMidnight.toISOString();
 }
 
 export function formatDateTime(iso: string): string {
@@ -44,6 +66,7 @@ export function formatDateTime(iso: string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Africa/Kampala",
   });
 }
 

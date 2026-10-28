@@ -14,10 +14,54 @@ export async function handleStreamRequest(request: Request, key: string): Promis
 
   // Normalize key and prevent directory traversal
   const normalizedKey = path.normalize(decodeURIComponent(key)).replace(/^(\.\.(\/|\\|$))+/, "");
-  const filePath = path.join(baseDir, normalizedKey);
+  let filePath = path.join(baseDir, normalizedKey);
 
   if (!filePath.startsWith(baseDir)) {
     return new Response("Forbidden", { status: 403 });
+  }
+
+  const url = new URL(request.url);
+  const quality = url.searchParams.get("quality");
+  const variantParam = url.searchParams.get("variant");
+  const isDownload = Boolean(url.searchParams.get("filename") || url.searchParams.get("download"));
+
+  // Check if a specific quality variant is requested and exists
+  if (variantParam || quality) {
+    let candidateVariantNames: string[] = [];
+    if (variantParam) {
+      candidateVariantNames = [
+        `${variantParam}.opus`,
+        `${variantParam}.m4a`,
+        `${variantParam}.mp3`,
+        variantParam,
+      ];
+    } else if (quality) {
+      if (isDownload) {
+        if (quality === "data_saver") candidateVariantNames = ["download_96k.m4a", "stream_96k.opus"];
+        else if (quality === "very_high") candidateVariantNames = ["aac_256k.m4a", "download_256k.m4a"];
+        else candidateVariantNames = ["download_160k.m4a", "stream_160k.opus"]; // standard
+      } else {
+        if (quality === "data_saver") candidateVariantNames = ["stream_64k.opus", "download_96k.m4a"];
+        else if (quality === "normal") candidateVariantNames = ["stream_96k.opus", "download_96k.m4a"];
+        else if (quality === "very_high") candidateVariantNames = ["aac_256k.m4a", "stream_160k.opus"];
+        else candidateVariantNames = ["stream_160k.opus", "aac_256k.m4a"]; // high
+      }
+    }
+
+    // Look for matching variant file relative to baseDir/variants or alongside current file
+    const fileBase = path.basename(filePath, path.extname(filePath));
+    for (const vName of candidateVariantNames) {
+      const candidates = [
+        path.join(path.dirname(filePath), vName),
+        path.join(baseDir, "variants", fileBase, vName),
+        path.join(baseDir, "variants", path.basename(path.dirname(filePath)), vName),
+      ];
+      const match = candidates.find((c) => fs.existsSync(c));
+      if (match) {
+        filePath = match;
+        break;
+      }
+    }
   }
 
   let stat: fs.Stats;
@@ -73,7 +117,6 @@ export async function handleStreamRequest(request: Request, key: string): Promis
   const nodeStream = fs.createReadStream(filePath);
   const webStream = Readable.toWeb(nodeStream);
 
-  const url = new URL(request.url);
   const downloadName = url.searchParams.get("filename") || url.searchParams.get("download");
   const disposition = downloadName
     ? `attachment; filename="${downloadName.replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`
@@ -99,7 +142,10 @@ function getAudioMimeType(filePath: string): string {
     case ".wav":
       return "audio/wav";
     case ".ogg":
+    case ".opus":
       return "audio/ogg";
+    case ".webm":
+      return "audio/webm";
     case ".m4a":
       return "audio/mp4";
     case ".aac":

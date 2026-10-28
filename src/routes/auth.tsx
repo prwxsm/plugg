@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   Headphones,
@@ -64,16 +64,32 @@ function AuthCardWrapper({
   onClose: () => void;
   maxWidth?: string;
 }) {
+  const desktopCardRef = useRef<HTMLDivElement>(null);
+  const mobileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const reset = () => {
+      if (desktopCardRef.current) desktopCardRef.current.scrollTop = 0;
+      if (mobileRef.current) mobileRef.current.scrollTop = 0;
+    };
+    reset();
+    const timer = setTimeout(reset, 60);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <>
       {/* Mobile solid view: 100% full screen solid page */}
-      <div className="md:hidden h-full w-full min-h-screen overflow-y-auto bg-background px-5 py-10 flex flex-col items-center justify-center">
+      <div
+        ref={mobileRef}
+        className="md:hidden h-full w-full min-h-screen overflow-y-auto bg-background px-5 py-10 flex flex-col items-center"
+      >
         <div className="w-full max-w-sm my-auto">{children}</div>
       </div>
 
       {/* Desktop overlay modal view: floating card over blurred background */}
       <div
-        className="hidden md:flex fixed inset-0 z-[100] items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
+        className="hidden md:flex fixed inset-0 z-[100] p-4 sm:p-6 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
@@ -81,8 +97,9 @@ function AuthCardWrapper({
         }}
       >
         <div
+          ref={desktopCardRef}
           className={cn(
-            "relative z-10 w-full rounded-3xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 my-auto max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200",
+            "relative z-10 w-full rounded-3xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 m-auto max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200",
             maxWidth,
           )}
           onClick={(e) => e.stopPropagation()}
@@ -91,7 +108,7 @@ function AuthCardWrapper({
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 sm:right-6 sm:top-6 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-elevated hover:text-foreground transition-colors"
+            className="absolute right-4 top-4 sm:right-6 sm:top-6 z-20 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-elevated hover:text-foreground transition-colors"
             title="Close (Esc)"
             aria-label="Close"
           >
@@ -260,7 +277,11 @@ function AuthPage() {
   // ── Sign-up: Account type selection step ──
   if (mode === "signup" && accountType === null) {
     return (
-      <AuthCardWrapper onClose={handleClose} maxWidth="max-w-md">
+      <AuthCardWrapper
+        key={`auth-card-${mode}-${accountType ?? "none"}`}
+        onClose={handleClose}
+        maxWidth="max-w-md"
+      >
         <div className="flex justify-center">
           <Link
             to="/"
@@ -335,8 +356,9 @@ function AuthPage() {
   return (
     <>
       <AuthCardWrapper
+        key={`auth-card-${mode}-${accountType ?? "none"}`}
         onClose={handleClose}
-        maxWidth={mode === "signup" && accountType === "artist" ? "max-w-lg" : "max-w-md"}
+        maxWidth="max-w-md"
       >
           <div className="flex justify-center">
             <Link

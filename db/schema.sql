@@ -13,7 +13,7 @@ BEGIN;
 
 CREATE TYPE account_type AS ENUM ('listener', 'artist');
 CREATE TYPE release_type AS ENUM ('single', 'EP', 'album');
-CREATE TYPE release_status AS ENUM ('published', 'scheduled', 'draft');
+CREATE TYPE release_status AS ENUM ('published', 'scheduled', 'draft', 'under_review', 'changes_required', 'processing');
 
 -- ---------------------------------------------------------------------------
 -- USERS
@@ -26,6 +26,7 @@ CREATE TABLE users (
     account_type account_type NOT NULL DEFAULT 'listener',
     avatar_url   TEXT NOT NULL DEFAULT '',
     artist_id    TEXT,  -- nullable; set when account_type = 'artist'
+    is_admin     BOOLEAN NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -76,19 +77,26 @@ CREATE TABLE genres (
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE releases (
-    id           TEXT PRIMARY KEY,
-    artist_id    TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
-    title        TEXT NOT NULL,
-    slug         TEXT NOT NULL,
-    type         release_type NOT NULL DEFAULT 'single',
-    cover_url    TEXT NOT NULL DEFAULT '',
-    release_date DATE NOT NULL,
-    status       release_status NOT NULL DEFAULT 'draft',
-    go_live_at   TIMESTAMPTZ,
-    description  TEXT,
-    label        TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id                      TEXT PRIMARY KEY,
+    artist_id               TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+    title                   TEXT NOT NULL,
+    slug                    TEXT NOT NULL,
+    type                    release_type NOT NULL DEFAULT 'single',
+    cover_url               TEXT NOT NULL DEFAULT '',
+    release_date            DATE NOT NULL,
+    status                  release_status NOT NULL DEFAULT 'draft',
+    go_live_at              TIMESTAMPTZ,
+    description             TEXT,
+    label                   TEXT,
+    review_submitted_at     TIMESTAMPTZ,
+    reviewed_at             TIMESTAMPTZ,
+    reviewer_id             TEXT,
+    review_feedback         TEXT,
+    audio_processing_status TEXT NOT NULL DEFAULT 'completed',
+    technical_validation    JSONB NOT NULL DEFAULT '{}',
+    review_history          JSONB NOT NULL DEFAULT '[]',
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (artist_id, slug)
 );
 
@@ -99,24 +107,29 @@ CREATE TABLE releases (
 CREATE SEQUENCE IF NOT EXISTS plugg_track_id_seq START WITH 1 INCREMENT BY 1 NO MAXVALUE NO CYCLE;
 
 CREATE TABLE tracks (
-    id               TEXT PRIMARY KEY,
-    plugg_track_id   TEXT NOT NULL UNIQUE,
-    artist_id        TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
-    release_id       TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
-    title            TEXT NOT NULL,
-    slug             TEXT NOT NULL,
-    genre            TEXT NOT NULL DEFAULT '',
-    cover_url        TEXT NOT NULL DEFAULT '',
-    audio_url        TEXT,
-    duration_seconds INTEGER NOT NULL DEFAULT 0,
-    play_count       BIGINT NOT NULL DEFAULT 0,
-    published        BOOLEAN NOT NULL DEFAULT TRUE,
-    release_date     DATE NOT NULL,
-    features         TEXT,
-    producers        TEXT,
-    lyrics           TEXT,
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id                      TEXT PRIMARY KEY,
+    plugg_track_id          TEXT NOT NULL UNIQUE,
+    artist_id               TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+    release_id              TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    title                   TEXT NOT NULL,
+    slug                    TEXT NOT NULL,
+    genre                   TEXT NOT NULL DEFAULT '',
+    cover_url               TEXT NOT NULL DEFAULT '',
+    audio_url               TEXT,
+    duration_seconds        INTEGER NOT NULL DEFAULT 0,
+    play_count              BIGINT NOT NULL DEFAULT 0,
+    download_count          BIGINT NOT NULL DEFAULT 0,
+    like_count              BIGINT NOT NULL DEFAULT 0,
+    published               BOOLEAN NOT NULL DEFAULT TRUE,
+    release_date            DATE NOT NULL,
+    features                TEXT,
+    producers               TEXT,
+    lyrics                  TEXT,
+    audio_processing_status TEXT NOT NULL DEFAULT 'completed',
+    technical_validation    JSONB NOT NULL DEFAULT '{}',
+    audio_variants          JSONB NOT NULL DEFAULT '{}',
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (release_id, slug)
 );
 
