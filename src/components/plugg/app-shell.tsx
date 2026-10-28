@@ -7,6 +7,7 @@ import {
   ChevronsRight,
   Search,
   Headphones,
+  Heart,
   Home,
   Library,
   Mic,
@@ -23,7 +24,7 @@ import { art } from "@/data/covers";
 import { cn } from "@/lib/utils";
 import { formatCount } from "@/lib/plugg";
 import { usePlugg } from "@/state/plugg-store";
-import { FullPlayer, PlayerBar } from "./player";
+import { FullPlayer, MobilePlayerBar, PlayerBar } from "./player";
 import { Button } from "@/components/ui/button";
 import { Home as GuestHome } from "@/routes/index";
 import { Discover as GuestDiscover } from "@/routes/discover";
@@ -50,7 +51,7 @@ const artistNav = [
 const mobileNav = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/discover", label: "Discover", icon: Search, exact: false },
-  { to: "/library", label: "Library", icon: Library, exact: false },
+  { to: "/library", label: "Library", icon: Heart, exact: false },
   { to: "/profile", label: "Profile", icon: UserRound, exact: false },
 ] as const;
 
@@ -508,30 +509,36 @@ export function AppShell({ children }: { children: ReactNode }) {
       <PlayerBar />
       <FullPlayer />
 
-      {/* Mobile bottom nav */}
-      <nav className={cn("fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 items-center bg-surface/95 px-2 py-2 backdrop-blur-xl md:hidden", isAuth && "hidden")}>
-        {mobileNav.map((item) => {
-          const profileSection =
-            isArtist &&
-            item.to === "/profile" &&
-            ["/profile", "/dashboard", "/upload"].includes(pathname);
-          const active =
-            profileSection || (item.exact ? pathname === item.to : pathname.startsWith(item.to));
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={cn(
-                "flex min-w-0 flex-col items-center justify-center gap-1 rounded-full py-1 text-[9px] font-medium transition-colors",
-                active ? "text-foreground" : "text-muted-foreground",
-              )}
-            >
-              <item.icon size={20} strokeWidth={1.8} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Mobile bottom floating dock & player */}
+      <div className={cn("fixed bottom-4 inset-x-0 z-40 flex flex-col items-center gap-2.5 px-3 pointer-events-none md:hidden", isAuth && "hidden")}>
+        <MobilePlayerBar />
+
+        <nav className="pointer-events-auto flex items-center gap-2 p-1.5 rounded-full bg-surface/90 backdrop-blur-2xl shadow-[0_12px_36px_rgba(0,0,0,0.65)]">
+          {mobileNav.map((item) => {
+            const profileSection =
+              isArtist &&
+              item.to === "/profile" &&
+              ["/profile", "/dashboard", "/upload"].includes(pathname);
+            const active =
+              profileSection || (item.exact ? pathname === item.to : pathname.startsWith(item.to));
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-label={item.label}
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-md scale-100 font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5 active:scale-95",
+                )}
+              >
+                <item.icon size={20} strokeWidth={active ? 2.3 : 1.9} />
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </div>
   );
 }

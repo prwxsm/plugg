@@ -363,22 +363,23 @@ function ProfilePage() {
 
           {!isEditing ? (
             /* CLEAN LISTENER PROFILE DISPLAY */
-            <div className="surface-card overflow-hidden rounded-2xl bg-card p-6 shadow-sm sm:p-8 space-y-7">
-              <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
-                <div className="relative group shrink-0">
-                  <img
-                    src={art(currentUser.avatarUrl)}
-                    alt={currentUser.name}
-                    className="h-24 w-24 rounded-full object-cover ring-4 ring-primary/20 shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-28 sm:w-28"
-                  />
-                </div>
+            <div className="surface-card overflow-hidden rounded-2xl sm:rounded-3xl bg-card border border-border/80 shadow-sm">
+              <div className="relative min-h-[220px] sm:min-h-[260px] flex flex-col justify-end overflow-hidden">
+                <img
+                  src={art(currentUser.avatarUrl)}
+                  alt={currentUser.name}
+                  className="absolute inset-0 h-full w-full object-cover object-center"
+                />
+                <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-card via-card/75 to-transparent pointer-events-none" />
+                <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-card via-card/95 to-transparent pointer-events-none" />
 
-                <div className="min-w-0 flex-1 text-left">
-                  <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                <div className="relative z-10 p-6 sm:p-8 space-y-2">
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground drop-shadow-sm">
                     {currentUser.name}
                   </h2>
 
-                  <div className="mt-1 flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-muted-foreground">
                       @{currentUser.username?.replace(/^@/, "") || currentUser.name.toLowerCase().replace(/\s+/g, "")}
                     </p>
@@ -534,72 +535,81 @@ function ProfilePage() {
 
           {!isEditing ? (
             /* CLEAN PROFILE DISPLAY */
-            <div className="surface-card overflow-hidden rounded-2xl bg-card p-6 shadow-sm sm:p-8 space-y-7">
-              {/* Profile image & Identity Hero */}
-              <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
-                <div className="relative group shrink-0">
-                  <img
-                    src={art(currentArtist.avatarUrl)}
-                    alt={currentArtist.displayName}
-                    className="h-24 w-24 rounded-full object-cover ring-4 ring-primary/20 shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-28 sm:w-28 md:h-32 md:w-32"
-                  />
-                </div>
+            <div className="surface-card overflow-hidden rounded-2xl sm:rounded-3xl bg-card border border-border/80 shadow-sm">
+              {/* Upper Section: Full-cover Profile Photo with smooth gradient fade */}
+              <div className="relative min-h-[280px] sm:min-h-[340px] flex flex-col justify-end overflow-hidden">
+                {/* Background Profile Photo */}
+                <img
+                  src={art(currentArtist.avatarUrl)}
+                  alt={currentArtist.displayName}
+                  className="absolute inset-0 h-full w-full object-cover object-center"
+                />
 
-                <div className="min-w-0 flex-1 text-left">
-                  <div className="flex flex-wrap items-start gap-1.5">
-                    <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                      {currentArtist.displayName}
-                    </h2>
-                    {currentArtist.verified ? (
-                      <span
-                        className="relative -top-0.5 sm:-top-1 inline-flex shrink-0 self-start"
-                        title="Verified artist"
-                      >
-                        <VerifiedBadge size="md" />
-                      </span>
-                    ) : null}
-                  </div>
+                {/* Subtle top vignette for depth */}
+                <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
 
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      @{currentArtist.username.replace(/^@/, "")}
-                    </p>
-                    {currentArtist.city || currentArtist.country || currentArtist.location ? (
-                      <div className="inline-flex items-center gap-1 text-xs text-muted-foreground/90">
-                        <span>•</span>
-                        <MapPin className="h-3 w-3 text-primary" />
-                        <span>
-                          {currentArtist.city && currentArtist.country
-                            ? `${currentArtist.city}, ${currentArtist.country}`
-                            : currentArtist.city || currentArtist.country || currentArtist.location}
+                {/* Lower gradient fade into card background */}
+                <div className="absolute inset-0 bg-gradient-to-t from-card via-card/75 to-transparent pointer-events-none" />
+                <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-card via-card/95 to-transparent pointer-events-none" />
+
+                {/* Content fading in on the lower part: Name, username, location, genres, buttons */}
+                <div className="relative z-10 p-6 sm:p-8 space-y-3.5">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground drop-shadow-sm">
+                        {currentArtist.displayName}
+                      </h2>
+                      {currentArtist.verified ? (
+                        <span
+                          className="inline-flex shrink-0 self-center"
+                          title="Verified artist"
+                        >
+                          <VerifiedBadge size="md" />
                         </span>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        @{currentArtist.username.replace(/^@/, "")}
+                      </p>
+                      {currentArtist.city || currentArtist.country || currentArtist.location ? (
+                        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground/90">
+                          <span>•</span>
+                          <MapPin className="h-3 w-3 text-primary" />
+                          <span>
+                            {currentArtist.city && currentArtist.country
+                              ? `${currentArtist.city}, ${currentArtist.country}`
+                              : currentArtist.city || currentArtist.country || currentArtist.location}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Genres Badges */}
+                    {currentArtist.primaryGenre ||
+                    (currentArtist.additionalGenres && currentArtist.additionalGenres.length > 0) ? (
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-1">
+                        {currentArtist.primaryGenre ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                            <Music2 className="h-3 w-3" />
+                            {currentArtist.primaryGenre}
+                          </span>
+                        ) : null}
+                        {currentArtist.additionalGenres?.map((g) => (
+                          <span
+                            key={g}
+                            className="inline-flex items-center rounded-full bg-elevated/80 px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                          >
+                            {g}
+                          </span>
+                        ))}
                       </div>
                     ) : null}
                   </div>
 
-                  {/* Genres Badges */}
-                  {currentArtist.primaryGenre ||
-                  (currentArtist.additionalGenres && currentArtist.additionalGenres.length > 0) ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      {currentArtist.primaryGenre ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                          <Music2 className="h-3 w-3" />
-                          {currentArtist.primaryGenre}
-                        </span>
-                      ) : null}
-                      {currentArtist.additionalGenres?.map((g) => (
-                        <span
-                          key={g}
-                          className="inline-flex items-center rounded-full bg-elevated px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-                        >
-                          {g}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-
                   {/* Actions: Edit Profile and View Public Page */}
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
                     <Button
                       onClick={() => setIsEditing(true)}
                       className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium shadow-xs"
@@ -621,6 +631,9 @@ function ProfilePage() {
               </div>
 
               <div className="h-px w-full bg-border/60" />
+
+              {/* Lower Section: Biography & Social Media */}
+              <div className="p-6 sm:p-8 space-y-7">
 
               {/* Biography Section */}
               <div className="space-y-2.5">
@@ -662,6 +675,7 @@ function ProfilePage() {
                 })()}
               </div>
             </div>
+          </div>
           ) : (
             /* EDIT PROFILE VIEW */
             <form

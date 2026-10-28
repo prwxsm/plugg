@@ -5,6 +5,8 @@ import {
   Maximize2,
   Mic,
   Minimize2,
+  Pause,
+  Play,
   Repeat,
   Repeat1,
   Shuffle,
@@ -501,31 +503,110 @@ export function PlayerBar() {
         </div>
       </div>
 
-      {/* ── Mobile player bar (slim, above bottom nav) ── */}
-      {hasTrack && currentTrack ? (
-        <div className="fixed inset-x-0 bottom-[68px] z-50 border-t border-border bg-background/95 backdrop-blur-xl md:hidden">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setFullPlayerOpen(true)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") setFullPlayerOpen(true);
-            }}
-            className="flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left"
-          >
-            <img src={art(currentTrack.coverUrl)} alt="" className="h-11 w-11 shrink-0 rounded object-cover" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{currentTrack.title}</span>
-              <span className="block truncate text-xs text-muted-foreground">{artist?.displayName}</span>
-            </span>
-            <div onClick={(e) => e.stopPropagation()}>
-              <PlayButton label={isPlaying ? "Pause" : "Play"} active={isPlaying} size="sm" onClick={togglePlay} />
-            </div>
-          </div>
-          <Scrubber className="absolute -top-0.5 left-0 !h-[3px] rounded-none" />
-        </div>
-      ) : null}
     </>
+  );
+}
+
+function MiniPlayerProgress() {
+  const { duration, isPlaying, getCurrentTime, progress } = usePlugg();
+  const barRef = useRef<HTMLDivElement | null>(null);
+
+  const initialPercent = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+
+  useEffect(() => {
+    if (!isPlaying || duration <= 0) {
+      const pct = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+      if (barRef.current) barRef.current.style.width = `${pct}%`;
+      return;
+    }
+
+    let animId: number;
+    const tick = () => {
+      const cur = getCurrentTime();
+      const pct = duration > 0 ? Math.min(100, Math.max(0, (cur / duration) * 100)) : 0;
+      if (barRef.current) barRef.current.style.width = `${pct}%`;
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, duration, getCurrentTime, progress]);
+
+  return (
+    <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20 overflow-hidden pointer-events-none">
+      <div
+        ref={barRef}
+        className="h-full bg-primary will-change-[width] shadow-[0_0_8px_rgba(204,255,0,0.6)]"
+        style={{ width: `${initialPercent}%` }}
+      />
+    </div>
+  );
+}
+
+export function MobilePlayerBar() {
+  const { currentTrack, isPlaying, togglePlay, setFullPlayerOpen, artists, clearPlayer } = usePlugg();
+  const artist = currentTrack ? artists.find((item) => item.id === currentTrack.artistId) : null;
+  if (!currentTrack) return null;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => setFullPlayerOpen(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") setFullPlayerOpen(true);
+      }}
+      className="pointer-events-auto relative flex w-full max-w-[360px] cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl bg-surface/90 backdrop-blur-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.65)] transition-all duration-200 active:scale-[0.99] animate-in slide-in-from-bottom-2"
+    >
+      {/* Cancel (cross) button at the edge top right */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          clearPlayer();
+        }}
+        className="absolute top-2 right-2.5 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-muted-foreground hover:bg-white/25 hover:text-foreground transition-all active:scale-90 shadow-xs"
+        title="Stop and close player"
+        aria-label="Stop and close player"
+      >
+        <X size={12} strokeWidth={2.5} />
+      </button>
+
+      <div className="flex min-w-0 items-center gap-3">
+        <img
+          src={art(currentTrack.coverUrl)}
+          alt=""
+          className="h-11 w-11 shrink-0 rounded-xl object-cover shadow-sm"
+        />
+        <div className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-foreground">
+            {currentTrack.title}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {artist?.displayName ?? "Unknown artist"}
+          </span>
+        </div>
+      </div>
+
+      {/* Play button adjusted leftward so top-right cancel button has clear visual space */}
+      <div className="shrink-0 mr-8" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform active:scale-90"
+          aria-label={isPlaying ? "Pause" : "Play"}
+        >
+          {isPlaying ? (
+            <Pause size={16} className="fill-current" />
+          ) : (
+            <Play size={16} className="fill-current ml-0.5" />
+          )}
+        </button>
+      </div>
+
+      {/* Real-time mini timer progress line running along the bottom */}
+      <MiniPlayerProgress />
+    </div>
   );
 }
 
@@ -548,11 +629,21 @@ export function FullPlayer() {
     artists,
     releases,
     settings,
+    isPlaying,
+    togglePlay,
+    next,
+    previous,
+    shuffle,
+    toggleShuffle,
+    repeatMode,
+    cycleRepeat,
+    isLiked,
+    toggleLike,
   } = usePlugg();
 
   const [activeTab, setActiveTab] = useState<InfoTab>("lyrics");
 
-  // Lock body and html scrolling when full player is active to prevent page overlay appearance
+  // Lock body and html scrolling when full player is active
   useEffect(() => {
     if (!fullPlayerOpen) return;
     const originalBodyOverflow = document.body.style.overflow;
@@ -582,12 +673,12 @@ export function FullPlayer() {
 
   return (
     <div
-      className="fixed inset-0 bottom-[76px] z-50 flex flex-col overflow-hidden bg-background md:bottom-[76px] animate-in fade-in duration-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background md:bottom-[76px] md:overflow-hidden animate-in fade-in duration-200"
       role="region"
       aria-label="Full screen player"
     >
       {/* Immersive blurred ambient backdrop */}
-      <div className="pointer-events-none fixed inset-0 bottom-[76px] overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden md:bottom-[76px]">
         <img
           src={art(currentTrack.coverUrl)}
           alt=""
@@ -596,22 +687,45 @@ export function FullPlayer() {
         <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/90 to-background" />
       </div>
 
-      <div className="relative mx-auto flex h-full w-full max-w-7xl flex-col justify-between px-6 py-4 sm:px-10 lg:px-14 overflow-hidden">
-        {/* Top Header Bar: Clean, prominent Plugg branding without distracting buttons */}
-        <header className="flex shrink-0 items-center justify-center py-3 sm:py-4">
-          <div className="flex items-center gap-3">
-            <img src={logoImg} alt="Plugg" className="h-9 w-9 sm:h-10 sm:w-10 object-contain drop-shadow" />
-            <span className="font-display text-lg sm:text-xl font-bold tracking-wide text-foreground">
+      <div className="relative mx-auto flex min-h-full w-full max-w-7xl flex-col justify-between px-5 py-4 sm:px-10 lg:px-14 pb-16 md:pb-4">
+        {/* Top Header Bar: Clean collapse button, Plugg branding, Like button */}
+        <header className="flex shrink-0 items-center justify-between py-3 sm:py-4">
+          <button
+            type="button"
+            onClick={() => setFullPlayerOpen(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface/60 hover:bg-surface text-muted-foreground hover:text-foreground transition-colors shadow-xs"
+            title="Collapse player"
+            aria-label="Collapse player"
+          >
+            <ChevronDown size={22} />
+          </button>
+
+          <div className="flex items-center gap-2.5">
+            <img src={logoImg} alt="Plugg" className="h-7 w-7 sm:h-8 sm:w-8 object-contain drop-shadow" />
+            <span className="font-display text-base sm:text-lg font-bold tracking-wide text-foreground">
               plugg<span className="text-muted-foreground">.</span>
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => toggleLike(currentTrack.id)}
+            className={cn(
+              "flex h-10 w-10 items-center justify-center rounded-full bg-surface/60 hover:bg-surface transition-colors shadow-xs",
+              isLiked(currentTrack.id) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+            title={isLiked(currentTrack.id) ? "Unlike song" : "Like song"}
+            aria-label={isLiked(currentTrack.id) ? "Unlike song" : "Like song"}
+          >
+            <Heart size={18} className={isLiked(currentTrack.id) ? "fill-current text-primary" : ""} />
+          </button>
         </header>
 
         {/* Main Content Area: 45% Artwork (Left) / 55% Information (Right) */}
         <div className="my-auto grid w-full flex-1 grid-cols-1 items-center gap-8 py-2 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)] lg:gap-14">
-          {/* Left Column: Visual Identity (Large Artwork, Title, Artist — without duplicate like icon) */}
+          {/* Left Column: Visual Identity (Artwork, Title, Artist) + Mobile Playback Controls */}
           <div className="flex min-w-0 flex-col items-center lg:items-start justify-center">
-            <div className="relative aspect-square w-full max-w-[340px] sm:max-w-[420px] overflow-hidden rounded-2xl shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)] ring-1 ring-white/10 group transition-all duration-300">
+            <div className="relative aspect-square w-full max-w-[320px] sm:max-w-[420px] overflow-hidden rounded-2xl shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)] group transition-all duration-300">
               <img
                 src={art(currentTrack.coverUrl)}
                 alt={`${currentTrack.title} cover art`}
@@ -619,8 +733,8 @@ export function FullPlayer() {
               />
             </div>
 
-            <div className="mt-5 w-full max-w-[340px] sm:max-w-[420px]">
-              <div className="flex items-center gap-2">
+            <div className="mt-5 w-full max-w-[320px] sm:max-w-[420px] text-center lg:text-left">
+              <div className="flex items-center justify-center lg:justify-start gap-2">
                 <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl" title={currentTrack.title}>
                   {currentTrack.title}
                 </h1>
@@ -633,7 +747,7 @@ export function FullPlayer() {
                   </span>
                 )}
               </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <div className="mt-1.5 flex flex-wrap items-center justify-center lg:justify-start gap-2 text-sm text-muted-foreground">
                 {artist ? (
                   <Link
                     to="/artist/$username"
@@ -651,12 +765,70 @@ export function FullPlayer() {
                 ) : null}
               </div>
             </div>
+
+            {/* Mobile Playback Controls: Scrubber & Control Buttons */}
+            <div className="mt-6 w-full max-w-[320px] sm:max-w-[420px] space-y-4 lg:hidden">
+              <div className="space-y-1.5">
+                <Scrubber className="w-full" />
+                <div className="flex justify-between text-xs tabular-nums text-muted-foreground px-0.5">
+                  <PlayerTime current />
+                  <PlayerTime />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 px-1">
+                <button
+                  type="button"
+                  onClick={toggleShuffle}
+                  className={cn("p-2.5 transition-colors", shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title={shuffle ? "Disable shuffle" : "Enable shuffle"}
+                >
+                  <Shuffle size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={previous}
+                  className="p-2.5 text-foreground hover:text-primary transition-colors"
+                  title="Previous track"
+                >
+                  <SkipBack size={22} />
+                </button>
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-all"
+                  title={isPlaying ? "Pause" : "Play"}
+                >
+                  {isPlaying ? (
+                    <Pause size={24} className="fill-current" />
+                  ) : (
+                    <Play size={24} className="fill-current ml-0.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={next}
+                  className="p-2.5 text-foreground hover:text-primary transition-colors"
+                  title="Next track"
+                >
+                  <SkipForward size={22} />
+                </button>
+                <button
+                  type="button"
+                  onClick={cycleRepeat}
+                  className={cn("p-2.5 transition-colors", repeatMode !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title={`Repeat: ${repeatMode}`}
+                >
+                  {repeatMode === "one" ? <Repeat1 size={18} /> : <Repeat size={18} />}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Right Column: Information Layer (Lyrics | About | Credits) */}
           <div className="flex w-full min-w-0 flex-col justify-center">
             {/* Tabs Header */}
-            <div className="flex items-center gap-8 border-b border-border/40 pb-3">
+            <div className="flex items-center gap-8 border-b border-border/40 pb-3 justify-center lg:justify-start">
               {(["lyrics", "about", "credits"] as const).map((tab) => {
                 const isActive = activeTab === tab;
                 const label = tab === "lyrics" ? "Lyrics" : tab === "about" ? "About" : "Credits";
@@ -678,17 +850,17 @@ export function FullPlayer() {
               })}
             </div>
 
-            {/* Tab Content Container (Fixed height with clean internal scroll) */}
-            <div className="mt-5 h-[340px] sm:h-[400px] lg:h-[450px] w-full overflow-hidden">
+            {/* Tab Content Container */}
+            <div className="mt-5 min-h-[260px] md:h-[380px] lg:h-[450px] w-full">
               {/* Lyrics Tab */}
               {activeTab === "lyrics" ? (
-                <div className="h-full overflow-y-auto pr-4 scrollbar-thin space-y-4">
+                <div className="h-full max-h-[500px] overflow-y-auto pr-4 scrollbar-thin space-y-4">
                   {currentTrack.lyrics?.trim() ? (
                     <p className="whitespace-pre-line text-lg sm:text-xl font-medium leading-relaxed sm:leading-loose text-foreground/90 selection:bg-primary/25">
                       {currentTrack.lyrics}
                     </p>
                   ) : (
-                    <div className="flex h-full flex-col items-center justify-center text-center p-6 text-muted-foreground space-y-3">
+                    <div className="flex min-h-[200px] flex-col items-center justify-center text-center p-6 text-muted-foreground space-y-3">
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface border border-border text-muted-foreground/60">
                         <Mic size={24} />
                       </div>

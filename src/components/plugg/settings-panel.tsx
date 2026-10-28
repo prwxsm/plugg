@@ -417,38 +417,41 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
 
       {/* Delete Confirmation Popup */}
       <AlertDialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <AlertDialogContent className="max-w-md rounded-2xl bg-card border border-border p-6 shadow-xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg font-bold text-foreground">
+        <AlertDialogContent className="w-[calc(100%-3rem)] max-w-[360px] sm:max-w-[380px] rounded-3xl bg-card/95 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl ring-1 ring-white/5">
+          <AlertDialogHeader className="space-y-3 text-center sm:text-center items-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 ring-8 ring-destructive/5 text-destructive mb-1">
+              <Trash2 className="h-5 w-5 stroke-[2.2]" />
+            </div>
+            <AlertDialogTitle className="text-lg sm:text-xl font-bold tracking-tight text-foreground text-center">
               Delete your account?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed mt-2">
+            <AlertDialogDescription className="text-xs sm:text-sm text-muted-foreground/90 leading-relaxed text-center px-1">
               Are you sure you want to permanently delete your Plugg account? This action cannot be undone. All your personal data, saved music, playlists, and {isArtist ? "uploaded releases and artist analytics" : "preferences"} will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-            <AlertDialogCancel
-              disabled={isDeleting}
-              className="rounded-full px-5 text-xs font-medium"
-            >
-              Cancel
-            </AlertDialogCancel>
+          <AlertDialogFooter className="mt-6 flex flex-col gap-2.5 sm:flex-col sm:space-x-0 w-full">
             <AlertDialogAction
               disabled={isDeleting}
               onClick={(e) => {
                 e.preventDefault();
                 handleDeleteAccount();
               }}
-              className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 px-5 text-xs font-semibold"
+              className="w-full h-11 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 text-sm font-semibold shadow-md shadow-destructive/25 transition-all active:scale-[0.98]"
             >
               {isDeleting ? (
                 <>
-                  <Loader2 size={13} className="mr-2 animate-spin" /> Deleting…
+                  <Loader2 size={15} className="mr-2 animate-spin" /> Deleting…
                 </>
               ) : (
                 "Yes, delete account"
               )}
             </AlertDialogAction>
+            <AlertDialogCancel
+              disabled={isDeleting}
+              className="w-full h-11 rounded-full bg-secondary/50 hover:bg-secondary text-foreground/80 hover:text-foreground border border-white/5 text-sm font-medium transition-all active:scale-[0.98] mt-0"
+            >
+              Cancel
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
