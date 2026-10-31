@@ -1,3 +1,4 @@
+import { handleAdminRequest } from "./server/api/admin";
 import { startPublicationWorker } from "./server/publication-worker";
 import "./lib/error-capture";
 
@@ -54,6 +55,8 @@ export default {
     try {
       startPublicationWorker();
       const url = new URL(request.url);
+
+      if (url.pathname.startsWith("/api/admin/v1/")) return await handleAdminRequest(request);
 
       // Route custom API endpoints
       if (url.pathname.startsWith("/api/stream/")) {

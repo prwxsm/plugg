@@ -1,3 +1,4 @@
+import { handleAdminRequest } from "../src/server/api/admin.ts";
 import { retryAudio } from "../src/server/admin-retry.ts";
 import bcrypt from "bcrypt";
 import { administer } from "../src/server/admin-operations.ts";
@@ -163,6 +164,55 @@ export async function testRuntime(sql) {
   const pw = "isolated-fixture-password";
   const hash = await bcrypt.hash(pw, 4);
   await sql`UPDATE users SET password_hash=${hash} WHERE id IN (${prefix + "super_admin"},${prefix + "ordinary"})`;
+  const apiRequest = (path, data, cookie = "") =>
+    new Request("http://localhost:3000/api/admin/v1/" + path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Plugg-Admin": "1",
+        Origin: "http://localhost:3000",
+        Cookie: cookie,
+      },
+      body: JSON.stringify(data),
+    });
+  const signIn = await handleAdminRequest(
+    apiRequest("login", { identifier: prefix + "super_admin@invalid.example", password: pw }),
+    sql,
+  );
+  assert.equal(signIn.status, 200);
+  const cookie = signIn.headers.get("set-cookie");
+  assert.ok(cookie.includes("HttpOnly") && cookie.includes("SameSite=Lax"));
+  const sessionCookie = cookie.split(";")[0];
+  const apiSnapshot = await handleAdminRequest(
+    new Request("http://localhost:3000/api/admin/v1/snapshot", {
+      headers: { Cookie: sessionCookie },
+    }),
+    sql,
+  );
+  assert.equal((await apiSnapshot.json()).data.currentUser.role, "super_admin");
+  assert.equal(
+    (
+      await handleAdminRequest(
+        apiRequest("login", { identifier: prefix + "ordinary@invalid.example", password: pw }),
+        sql,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await handleAdminRequest(apiRequest("logout", {}, sessionCookie), sql)).status,
+    200,
+  );
+  const afterLogout = await handleAdminRequest(
+    new Request("http://localhost:3000/api/admin/v1/snapshot", {
+      headers: { Cookie: sessionCookie },
+    }),
+    sql,
+  );
+  assert.equal((await afterLogout.json()).status, "unauthenticated");
+  console.log(
+    "PASS: standalone REST login, HttpOnly session cookie, active-membership enforcement and logout on isolated copy.",
+  );
   const staff = {
     ...base,
     targetId: prefix + "ordinary",
