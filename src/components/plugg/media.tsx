@@ -162,9 +162,13 @@ export function ArtistCard({
           </span>
         ) : null}
       </div>
-      <p className="mt-3 flex items-center justify-center gap-1 truncate text-sm font-medium">
+      <p className="mt-3 flex items-center justify-center gap-1.5 truncate text-sm font-medium">
         <span className="truncate">{artist.displayName}</span>
-        {artist.verified ? <VerifiedBadge /> : null}
+        {artist.verified ? (
+          <span className="relative -top-0.5 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
+            <VerifiedBadge size="xs" />
+          </span>
+        ) : null}
       </p>
       <p className="mt-0.5 truncate text-xs text-muted-foreground">
         {subtext || `${formatCount(artist.monthlyListeners)} listeners`}

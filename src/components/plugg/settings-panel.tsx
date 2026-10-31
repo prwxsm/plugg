@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Check, Mic, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/plugg/primitives";
+import { Button, VerifiedBadge } from "@/components/plugg/primitives";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,7 +113,14 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
                 className="h-14 w-14 rounded-full object-cover ring-2 ring-primary/20 shadow-md shrink-0"
               />
               <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="text-base font-semibold text-foreground truncate">{currentUser.name}</p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <p className="text-base font-semibold text-foreground truncate">{currentUser.name}</p>
+                  {currentArtist?.verified ? (
+                    <span className="relative -top-0.5 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
+                      <VerifiedBadge size="sm" />
+                    </span>
+                  ) : null}
+                </div>
                 <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
               </div>
             </div>
@@ -122,11 +129,23 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
               <div className="rounded-xl bg-primary/5 p-4 space-y-1.5">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary capitalize">
-                    <Mic size={12} strokeWidth={2} /> Artist Account
+                    {currentArtist?.verified ? (
+                      <>
+                        <VerifiedBadge size="xs" />
+                        <span>Verified Plugg Artist</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={12} strokeWidth={2} />
+                        <span>Artist Account</span>
+                      </>
+                    )}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground pt-1">
-                  Your artist account unlocks music uploads, your public artist profile, and real-time streaming analytics.
+                  {currentArtist?.verified
+                    ? "Your verified Plugg artist account is officially confirmed. Unlocks music uploads, your public artist profile, and real-time streaming analytics."
+                    : "Your artist account unlocks music uploads, your public artist profile, and real-time streaming analytics."}
                 </p>
                 <div className="pt-2 flex gap-3">
                   <Link

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import sql from "@/lib/db";
 import { getStorageProvider } from "@/lib/storage";
 
@@ -52,6 +54,30 @@ export async function handleUploadRequest(request: Request): Promise<Response> {
 
     const storage = getStorageProvider();
     await storage.saveFile(storageKey, buffer, file.type);
+
+    // Deep FFprobe validation on server-saved file
+    if (category === "audio") {
+      const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
+      const savedFilePath = path.join(baseDir, storageKey);
+      const { probeAndValidateAudio } = await import("@/server/audio-processor");
+      const probeResult = await probeAndValidateAudio(savedFilePath);
+      if (!probeResult.valid) {
+        try {
+          if (fs.existsSync(savedFilePath)) await fs.promises.unlink(savedFilePath);
+        } catch {}
+        return new Response(
+          JSON.stringify({
+            error: probeResult.error || "Audio file does not meet Plugg master requirements",
+            validation: probeResult.properties,
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      technicalValidation = probeResult.properties;
+    }
 
     const fileId = crypto.randomUUID();
     const resolvedOwnerId = ownerId || "system";

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BecomeArtistRouteImport } from './routes/become-artist'
 import { Route as CopyrightRouteImport } from './routes/copyright'
@@ -22,6 +23,16 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as AdminArtistsRouteImport } from './routes/admin.artists'
+import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
+import { Route as AdminGenresRouteImport } from './routes/admin.genres'
+import { Route as AdminProcessingRouteImport } from './routes/admin.processing'
+import { Route as AdminReviewQueueRouteImport } from './routes/admin.review-queue'
+import { Route as AdminScheduledRouteImport } from './routes/admin.scheduled'
+import { Route as AdminStaffRouteImport } from './routes/admin.staff'
+import { Route as AdminTelemetryRouteImport } from './routes/admin.telemetry'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as ArtistUsernameRouteImport } from './routes/artist.$username'
 import { Route as GenreSlugRouteImport } from './routes/genre.$slug'
 import { Route as LegalDocIdRouteImport } from './routes/legal.$docId'
@@ -32,6 +43,11 @@ import { Route as TrackIdRouteImport } from './routes/track.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -94,6 +110,56 @@ const UploadRoute = UploadRouteImport.update({
   path: '/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminArtistsRoute = AdminArtistsRouteImport.update({
+  id: '/artists',
+  path: '/artists',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCatalogRoute = AdminCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminGenresRoute = AdminGenresRouteImport.update({
+  id: '/genres',
+  path: '/genres',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProcessingRoute = AdminProcessingRouteImport.update({
+  id: '/processing',
+  path: '/processing',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReviewQueueRoute = AdminReviewQueueRouteImport.update({
+  id: '/review-queue',
+  path: '/review-queue',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminScheduledRoute = AdminScheduledRouteImport.update({
+  id: '/scheduled',
+  path: '/scheduled',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminStaffRoute = AdminStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTelemetryRoute = AdminTelemetryRouteImport.update({
+  id: '/telemetry',
+  path: '/telemetry',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ArtistUsernameRoute = ArtistUsernameRouteImport.update({
   id: '/artist/$username',
   path: '/artist/$username',
@@ -127,6 +193,7 @@ const TrackIdRoute = TrackIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/become-artist': typeof BecomeArtistRoute
   '/copyright': typeof CopyrightRoute
@@ -139,6 +206,16 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/updates': typeof UpdatesRoute
   '/upload': typeof UploadRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/artists': typeof AdminArtistsRoute
+  '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/genres': typeof AdminGenresRoute
+  '/admin/processing': typeof AdminProcessingRoute
+  '/admin/review-queue': typeof AdminReviewQueueRoute
+  '/admin/scheduled': typeof AdminScheduledRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/admin/telemetry': typeof AdminTelemetryRoute
+  '/admin/users': typeof AdminUsersRoute
   '/artist/$username': typeof ArtistUsernameRoute
   '/genre/$slug': typeof GenreSlugRoute
   '/legal/$docId': typeof LegalDocIdRoute
@@ -148,6 +225,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/become-artist': typeof BecomeArtistRoute
   '/copyright': typeof CopyrightRoute
@@ -160,6 +238,16 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/updates': typeof UpdatesRoute
   '/upload': typeof UploadRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/artists': typeof AdminArtistsRoute
+  '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/genres': typeof AdminGenresRoute
+  '/admin/processing': typeof AdminProcessingRoute
+  '/admin/review-queue': typeof AdminReviewQueueRoute
+  '/admin/scheduled': typeof AdminScheduledRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/admin/telemetry': typeof AdminTelemetryRoute
+  '/admin/users': typeof AdminUsersRoute
   '/artist/$username': typeof ArtistUsernameRoute
   '/genre/$slug': typeof GenreSlugRoute
   '/legal/$docId': typeof LegalDocIdRoute
@@ -170,6 +258,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/become-artist': typeof BecomeArtistRoute
   '/copyright': typeof CopyrightRoute
@@ -182,6 +271,16 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/updates': typeof UpdatesRoute
   '/upload': typeof UploadRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/artists': typeof AdminArtistsRoute
+  '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/genres': typeof AdminGenresRoute
+  '/admin/processing': typeof AdminProcessingRoute
+  '/admin/review-queue': typeof AdminReviewQueueRoute
+  '/admin/scheduled': typeof AdminScheduledRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/admin/telemetry': typeof AdminTelemetryRoute
+  '/admin/users': typeof AdminUsersRoute
   '/artist/$username': typeof ArtistUsernameRoute
   '/genre/$slug': typeof GenreSlugRoute
   '/legal/$docId': typeof LegalDocIdRoute
@@ -193,6 +292,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auth'
     | '/become-artist'
     | '/copyright'
@@ -205,6 +305,16 @@ export interface FileRouteTypes {
     | '/terms'
     | '/updates'
     | '/upload'
+    | '/admin/analytics'
+    | '/admin/artists'
+    | '/admin/catalog'
+    | '/admin/genres'
+    | '/admin/processing'
+    | '/admin/review-queue'
+    | '/admin/scheduled'
+    | '/admin/staff'
+    | '/admin/telemetry'
+    | '/admin/users'
     | '/artist/$username'
     | '/genre/$slug'
     | '/legal/$docId'
@@ -214,6 +324,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auth'
     | '/become-artist'
     | '/copyright'
@@ -226,6 +337,16 @@ export interface FileRouteTypes {
     | '/terms'
     | '/updates'
     | '/upload'
+    | '/admin/analytics'
+    | '/admin/artists'
+    | '/admin/catalog'
+    | '/admin/genres'
+    | '/admin/processing'
+    | '/admin/review-queue'
+    | '/admin/scheduled'
+    | '/admin/staff'
+    | '/admin/telemetry'
+    | '/admin/users'
     | '/artist/$username'
     | '/genre/$slug'
     | '/legal/$docId'
@@ -235,6 +356,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auth'
     | '/become-artist'
     | '/copyright'
@@ -247,6 +369,16 @@ export interface FileRouteTypes {
     | '/terms'
     | '/updates'
     | '/upload'
+    | '/admin/analytics'
+    | '/admin/artists'
+    | '/admin/catalog'
+    | '/admin/genres'
+    | '/admin/processing'
+    | '/admin/review-queue'
+    | '/admin/scheduled'
+    | '/admin/staff'
+    | '/admin/telemetry'
+    | '/admin/users'
     | '/artist/$username'
     | '/genre/$slug'
     | '/legal/$docId'
@@ -257,6 +389,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   BecomeArtistRoute: typeof BecomeArtistRoute
   CopyrightRoute: typeof CopyrightRoute
@@ -284,6 +417,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -370,6 +510,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/artists': {
+      id: '/admin/artists'
+      path: '/artists'
+      fullPath: '/admin/artists'
+      preLoaderRoute: typeof AdminArtistsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/catalog': {
+      id: '/admin/catalog'
+      path: '/catalog'
+      fullPath: '/admin/catalog'
+      preLoaderRoute: typeof AdminCatalogRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/genres': {
+      id: '/admin/genres'
+      path: '/genres'
+      fullPath: '/admin/genres'
+      preLoaderRoute: typeof AdminGenresRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/processing': {
+      id: '/admin/processing'
+      path: '/processing'
+      fullPath: '/admin/processing'
+      preLoaderRoute: typeof AdminProcessingRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/review-queue': {
+      id: '/admin/review-queue'
+      path: '/review-queue'
+      fullPath: '/admin/review-queue'
+      preLoaderRoute: typeof AdminReviewQueueRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/scheduled': {
+      id: '/admin/scheduled'
+      path: '/scheduled'
+      fullPath: '/admin/scheduled'
+      preLoaderRoute: typeof AdminScheduledRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/staff': {
+      id: '/admin/staff'
+      path: '/staff'
+      fullPath: '/admin/staff'
+      preLoaderRoute: typeof AdminStaffRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/telemetry': {
+      id: '/admin/telemetry'
+      path: '/telemetry'
+      fullPath: '/admin/telemetry'
+      preLoaderRoute: typeof AdminTelemetryRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/artist/$username': {
       id: '/artist/$username'
       path: '/artist/$username'
@@ -415,8 +625,37 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminArtistsRoute: typeof AdminArtistsRoute
+  AdminCatalogRoute: typeof AdminCatalogRoute
+  AdminGenresRoute: typeof AdminGenresRoute
+  AdminProcessingRoute: typeof AdminProcessingRoute
+  AdminReviewQueueRoute: typeof AdminReviewQueueRoute
+  AdminScheduledRoute: typeof AdminScheduledRoute
+  AdminStaffRoute: typeof AdminStaffRoute
+  AdminTelemetryRoute: typeof AdminTelemetryRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminArtistsRoute: AdminArtistsRoute,
+  AdminCatalogRoute: AdminCatalogRoute,
+  AdminGenresRoute: AdminGenresRoute,
+  AdminProcessingRoute: AdminProcessingRoute,
+  AdminReviewQueueRoute: AdminReviewQueueRoute,
+  AdminScheduledRoute: AdminScheduledRoute,
+  AdminStaffRoute: AdminStaffRoute,
+  AdminTelemetryRoute: AdminTelemetryRoute,
+  AdminUsersRoute: AdminUsersRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   BecomeArtistRoute: BecomeArtistRoute,
   CopyrightRoute: CopyrightRoute,

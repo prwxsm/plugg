@@ -458,23 +458,23 @@ function AudioRequirementsNotice({ errorList }: { errorList?: string[] | undefin
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-muted-foreground">
           <li className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-            <span>Accepted formats: <strong className="text-foreground font-medium">WAV or FLAC</strong></span>
+            <span>Accepted formats: <strong className="text-foreground font-medium">WAV, FLAC, MP3</strong></span>
           </li>
           <li className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-            <span>Minimum quality: <strong className="text-foreground font-medium">16-bit / 44.1 kHz</strong></span>
+            <span>Recommended: <strong className="text-foreground font-medium">WAV/FLAC (or MP3 256–320k)</strong></span>
           </li>
           <li className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-            <span>Channels: <strong className="text-foreground font-medium">Stereo</strong></span>
+            <span>Minimum quality: <strong className="text-foreground font-medium">16-bit / 44.1 kHz (Lossless) · 192k (MP3)</strong></span>
           </li>
           <li className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-            <span>Recommended: <strong className="text-foreground font-medium">Original 24-bit master</strong></span>
+            <span>Channels: <strong className="text-foreground font-medium">Stereo (2 channels)</strong></span>
           </li>
         </ul>
         <p className="text-[11px] text-muted-foreground italic pt-2 border-t border-border/40 leading-relaxed">
-          Upload your original high-quality audio master. Plugg automatically prepares the streaming and download versions.
+          Upload your original audio. Plugg automatically validates audio streams and prepares all streaming and download versions.
         </p>
       </div>
 
@@ -512,6 +512,7 @@ function UploadPage() {
   const [description, setDescription] = useState("");
   const [songs, setSongs] = useState<SongDraft[]>([emptySongDraft()]);
   const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [uploadStatusText, setUploadStatusText] = useState<string>("Uploading…");
 
   const [audioValidationErrors, setAudioValidationErrors] = useState<Record<number, string[]>>({});
   const [audioValidationDetails, setAudioValidationDetails] = useState<Record<number, TechnicalValidation>>({});
@@ -520,7 +521,8 @@ function UploadPage() {
   const handleAudioFileSelect = async (index: number, file: File) => {
     setIsValidatingAudio((prev) => ({ ...prev, [index]: true }));
     try {
-      const valResult = await validateAudioFileInBrowser(file);
+      const realSec = await getAudioDuration(file);
+      const valResult = await validateAudioFileInBrowser(file, realSec);
       if (!valResult.valid) {
         const errorMsg = valResult.error || "Audio requirements not met";
         setAudioValidationErrors((prev) => ({ ...prev, [index]: [errorMsg] }));
@@ -545,17 +547,30 @@ function UploadPage() {
       patchSong(index, {
         title: (index === 0 && isSingle ? title : songs[index]?.title) || file.name.replace(/\.[^/.]+$/, ""),
         file: { name: file.name, size: file.size },
-        durationSeconds: estimateDuration(file.size),
+        durationSeconds: realSec > 0 ? realSec : estimateDuration(file.size),
       });
-      getAudioDuration(file).then((realSec) => {
-        if (realSec > 0) patchSong(index, { durationSeconds: realSec });
-      });
-      const formatLabel = valResult.properties.format ? valResult.properties.format.toUpperCase() : "MASTER";
+
+      const isMp3Format = valResult.properties.format === "MP3";
       const sampleRateLabel = valResult.properties.sampleRate ? `${valResult.properties.sampleRate / 1000} kHz` : "";
-      const bitDepthLabel = valResult.properties.bitDepth ? `${valResult.properties.bitDepth}-bit` : "";
-      toast.success(
-        `Audio master validated: ${formatLabel} ${sampleRateLabel} / ${bitDepthLabel}`
-      );
+
+      if (isMp3Format) {
+        const bitrateLabel = valResult.properties.bitrateKbps ? `${valResult.properties.bitrateKbps} kbps` : "";
+        if (valResult.warning || valResult.qualityWarning) {
+          toast.warning(
+            `Audio accepted with quality flag: MP3 ${bitrateLabel} (${valResult.qualityWarning || "Quality review flag"})`,
+          );
+        } else {
+          toast.success(
+            `Audio validated: MP3 ${bitrateLabel} · ${sampleRateLabel}`,
+          );
+        }
+      } else {
+        const formatLabel = valResult.properties.format ? valResult.properties.format.toUpperCase() : "MASTER";
+        const bitDepthLabel = valResult.properties.bitDepth ? `${valResult.properties.bitDepth}-bit` : "";
+        toast.success(
+          `Audio master validated: ${formatLabel} ${sampleRateLabel} / ${bitDepthLabel}`,
+        );
+      }
     } catch (err: any) {
       setAudioValidationErrors((prev) => ({ ...prev, [index]: [err.message || "Could not read audio file"] }));
       toast.error("Failed to inspect audio file");
@@ -752,7 +767,7 @@ function UploadPage() {
   const singleRequirements = [
     { label: "Song title", done: title.trim().length > 0 },
     {
-      label: "Audio master (WAV/FLAC, 16-bit / 44.1 kHz stereo+)",
+      label: "Audio master (WAV, FLAC, or MP3 192k+ stereo)",
       done: Boolean(songs[0]?.file && !audioValidationErrors[0]?.length),
     },
     {
@@ -774,7 +789,7 @@ function UploadPage() {
       done: songs.length > 0 && songs.every((s) => s.title.trim().length > 0),
     },
     {
-      label: "Audio master for every song (WAV/FLAC)",
+      label: "Audio master for every song (WAV, FLAC, or MP3 192k+)",
       done:
         songs.length > 0 &&
         readySongs.length === songs.length &&
@@ -955,12 +970,14 @@ function UploadPage() {
   const handleSubmit = async () => {
     try {
       setUploadPercent(10);
+      setUploadStatusText("Uploading…");
       const updatedSongs = [...readySongs];
       let finalCoverKey = coverKey;
 
       // Upload cover file if uploaded from device
       if (coverFile) {
         try {
+          setUploadStatusText("Uploading cover artwork…");
           const fd = new FormData();
           fd.append("file", coverFile);
           fd.append("category", "cover");
@@ -980,14 +997,17 @@ function UploadPage() {
         const raw = rawAudioFiles.current.get(idx);
         if (raw) {
           try {
+            setUploadStatusText(`Uploading audio (${idx + 1}/${updatedSongs.length})…`);
             const fd = new FormData();
             fd.append("file", raw);
             fd.append("category", "audio");
             if (currentUser?.id) fd.append("ownerId", currentUser.id);
 
+            setUploadStatusText(`Validating audio on server (${raw.name})…`);
             const res = await fetch("/api/upload", { method: "POST", body: fd });
             const data = await res.json();
             if (!res.ok) {
+              setUploadStatusText("Audio requires correction");
               toast.error(data.error || "Audio validation rejected by server");
               setUploadPercent(null);
               return;
@@ -998,6 +1018,7 @@ function UploadPage() {
             }
           } catch (uploadErr: any) {
             console.error("File upload to server failed:", uploadErr);
+            setUploadStatusText("Processing failed");
             toast.error(uploadErr.message || "Failed to upload audio to server");
             setUploadPercent(null);
             return;
@@ -1006,7 +1027,8 @@ function UploadPage() {
         setUploadPercent(Math.min(90, Math.round(((idx + 1) / updatedSongs.length) * 80) + 10));
       }
 
-      setUploadPercent(100);
+      setUploadPercent(95);
+      setUploadStatusText("Processing audio and creating release…");
       await createRelease({
         title:
           title.trim() ||
@@ -1020,9 +1042,12 @@ function UploadPage() {
         songs: updatedSongs,
       });
 
+      setUploadPercent(100);
+      setUploadStatusText("Under Review");
       window.setTimeout(() => navigate({ to: "/dashboard", search: { tab: "releases" } }), 400);
     } catch (err) {
       console.error("Failed to complete release:", err);
+      setUploadStatusText("Processing failed");
       setUploadPercent(null);
     }
   };
@@ -1189,7 +1214,7 @@ function UploadPage() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">Upload song audio file</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Requires WAV or FLAC (16-bit / 44.1 kHz stereo minimum)
+                      Accepted: WAV, FLAC, MP3 (256–320 kbps MP3 or 16-bit/44.1 kHz lossless stereo)
                     </p>
                   </div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
@@ -1197,7 +1222,7 @@ function UploadPage() {
                   </span>
                   <input
                     type="file"
-                    accept=".wav,.flac,audio/wav,audio/flac,audio/x-wav,audio/x-flac"
+                    accept=".wav,.flac,.mp3,audio/wav,audio/flac,audio/mpeg,audio/mp3,audio/x-wav,audio/x-flac"
                     className="sr-only"
                     disabled={isValidatingAudio[0]}
                     onChange={(e) => {
@@ -1224,9 +1249,16 @@ function UploadPage() {
                         {audioValidationDetails[0] && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-mono font-medium text-primary">
                             {audioValidationDetails[0].format?.toUpperCase()} ·{" "}
-                            {audioValidationDetails[0].sampleRate ? `${audioValidationDetails[0].sampleRate / 1000} kHz` : ""} ·{" "}
-                            {audioValidationDetails[0].bitDepth}-bit
+                            {audioValidationDetails[0].format === "MP3"
+                              ? `${audioValidationDetails[0].bitrateKbps || ""} kbps${audioValidationDetails[0].isVbr ? " VBR" : ""}`
+                              : `${audioValidationDetails[0].bitDepth}-bit`} ·{" "}
+                            {audioValidationDetails[0].sampleRate ? `${audioValidationDetails[0].sampleRate / 1000} kHz` : ""}
                             {audioValidationDetails[0].bitDepth && audioValidationDetails[0].bitDepth >= 24 ? " Master" : ""}
+                          </span>
+                        )}
+                        {audioValidationDetails[0]?.qualityWarning && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                            {audioValidationDetails[0].qualityWarning}
                           </span>
                         )}
                       </div>
@@ -1241,7 +1273,7 @@ function UploadPage() {
                       Replace
                       <input
                         type="file"
-                        accept=".wav,.flac,audio/wav,audio/flac,audio/x-wav,audio/x-flac"
+                        accept=".wav,.flac,.mp3,audio/wav,audio/flac,audio/mpeg,audio/mp3,audio/x-wav,audio/x-flac"
                         className="sr-only"
                         disabled={isValidatingAudio[0]}
                         onChange={(e) => {
@@ -1409,7 +1441,7 @@ function UploadPage() {
                             Upload song audio file
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Requires WAV or FLAC (16-bit / 44.1 kHz stereo minimum)
+                            Accepted: WAV, FLAC, MP3 (256–320 kbps MP3 or 16-bit/44.1 kHz lossless stereo)
                           </p>
                         </div>
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
@@ -1417,7 +1449,7 @@ function UploadPage() {
                         </span>
                         <input
                           type="file"
-                          accept=".wav,.flac,audio/wav,audio/flac,audio/x-wav,audio/x-flac"
+                          accept=".wav,.flac,.mp3,audio/wav,audio/flac,audio/mpeg,audio/mp3,audio/x-wav,audio/x-flac"
                           className="sr-only"
                           disabled={isValidatingAudio[i]}
                           onChange={(e) => {
@@ -1444,9 +1476,16 @@ function UploadPage() {
                               {audioValidationDetails[i] && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-mono font-medium text-primary">
                                   {audioValidationDetails[i].format?.toUpperCase()} ·{" "}
-                                  {audioValidationDetails[i].sampleRate ? `${audioValidationDetails[i].sampleRate / 1000} kHz` : ""} ·{" "}
-                                  {audioValidationDetails[i].bitDepth}-bit
+                                  {audioValidationDetails[i].format === "MP3"
+                                    ? `${audioValidationDetails[i].bitrateKbps || ""} kbps${audioValidationDetails[i].isVbr ? " VBR" : ""}`
+                                    : `${audioValidationDetails[i].bitDepth}-bit`} ·{" "}
+                                  {audioValidationDetails[i].sampleRate ? `${audioValidationDetails[i].sampleRate / 1000} kHz` : ""}
                                   {audioValidationDetails[i].bitDepth && audioValidationDetails[i].bitDepth >= 24 ? " Master" : ""}
+                                </span>
+                              )}
+                              {audioValidationDetails[i]?.qualityWarning && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                                  {audioValidationDetails[i].qualityWarning}
                                 </span>
                               )}
                             </div>
@@ -1461,7 +1500,7 @@ function UploadPage() {
                             Replace
                             <input
                               type="file"
-                              accept=".wav,.flac,audio/wav,audio/flac,audio/x-wav,audio/x-flac"
+                              accept=".wav,.flac,.mp3,audio/wav,audio/flac,audio/mpeg,audio/mp3,audio/x-wav,audio/x-flac"
                               className="sr-only"
                               disabled={isValidatingAudio[i]}
                               onChange={(e) => {
@@ -1733,7 +1772,7 @@ function UploadPage() {
               <div>
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
-                    Uploading {readySongs.length} song{readySongs.length === 1 ? "" : "s"}…
+                    {uploadStatusText}
                   </span>
                   <span className="tabular-nums">{uploadPercent}%</span>
                 </div>
@@ -1767,7 +1806,7 @@ function UploadPage() {
           </Button>
         ) : (
           <Button disabled={!canContinue || uploadPercent !== null} onClick={handleSubmit}>
-            {uploadPercent !== null ? "Uploading…" : "Schedule release"}
+            {uploadPercent !== null ? uploadStatusText : "Schedule release"}
           </Button>
         )}
       </div>

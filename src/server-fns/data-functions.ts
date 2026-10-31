@@ -1,7 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import sql from "@/lib/db";
 import { getUserFromSession } from "@/lib/auth";
-import type { Artist, Genre, Playlist, Release, Track, Analytics, User, ReleaseStatus } from "@/data/types";
+import type {
+  Artist,
+  Genre,
+  Playlist,
+  Release,
+  Track,
+  Analytics,
+  User,
+  ReleaseStatus,
+} from "@/data/types";
 import { fallbackAnalytics } from "@/data/analytics";
 import { goLiveAt, todayISO } from "@/lib/plugg";
 import { tracks as seedTracks } from "@/data/tracks";
@@ -34,6 +43,7 @@ export function parseSocialLinks(val: unknown): Record<string, string> {
 export const getInitialData = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getUserFromSession();
 
+  // Publication is performed by the controlled backend scheduler, never by this GET loader.
   // Fetch artists
   const dbArtists = await sql<
     {
@@ -148,8 +158,12 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     producers: t.producers || undefined,
     lyrics: t.lyrics || undefined,
     audioProcessingStatus: t.audioProcessingStatus || "completed",
-    technicalValidation: t.technicalValidation && Object.keys(t.technicalValidation).length > 0 ? t.technicalValidation : undefined,
-    audioVariants: t.audioVariants && Object.keys(t.audioVariants).length > 0 ? t.audioVariants : undefined,
+    technicalValidation:
+      t.technicalValidation && Object.keys(t.technicalValidation).length > 0
+        ? t.technicalValidation
+        : undefined,
+    audioVariants:
+      t.audioVariants && Object.keys(t.audioVariants).length > 0 ? t.audioVariants : undefined,
   }));
 
   // Fetch release track ordering
@@ -163,24 +177,6 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     const list = releaseTrackMap.get(link.releaseId) ?? [];
     list.push(link.trackId);
     releaseTrackMap.set(link.releaseId, list);
-  }
-
-  // Auto-sync status for scheduled releases that have reached their go_live_at (Kampala midnight)
-  try {
-    await sql`
-      UPDATE releases
-      SET status = 'published', updated_at = now()
-      WHERE status = 'scheduled' AND go_live_at IS NOT NULL AND go_live_at <= now()
-    `;
-    await sql`
-      UPDATE tracks
-      SET published = true, updated_at = now()
-      WHERE published = false AND release_id IN (
-        SELECT id FROM releases WHERE status = 'published'
-      )
-    `;
-  } catch (syncErr) {
-    console.warn("Could not auto-sync scheduled releases in fetchInitialDataFn:", syncErr);
   }
 
   // Fetch releases
@@ -220,8 +216,7 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
 
   const releases: Release[] = dbReleases.map((r) => {
     const trackIds =
-      releaseTrackMap.get(r.id) ??
-      tracks.filter((t) => t.releaseId === r.id).map((t) => t.id);
+      releaseTrackMap.get(r.id) ?? tracks.filter((t) => t.releaseId === r.id).map((t) => t.id);
 
     return {
       id: r.id,
@@ -256,7 +251,10 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
       reviewerId: r.reviewerId || undefined,
       reviewFeedback: r.reviewFeedback || undefined,
       audioProcessingStatus: r.audioProcessingStatus || "completed",
-      technicalValidation: r.technicalValidation && Object.keys(r.technicalValidation).length > 0 ? r.technicalValidation : undefined,
+      technicalValidation:
+        r.technicalValidation && Object.keys(r.technicalValidation).length > 0
+          ? r.technicalValidation
+          : undefined,
       reviewHistory: Array.isArray(r.reviewHistory) ? r.reviewHistory : undefined,
     };
   });
@@ -544,9 +542,7 @@ async function getEffectiveUser(): Promise<User> {
 }
 
 export const createPlaylistFn = createServerFn({ method: "POST" })
-  .validator(
-    (data: { id?: string; name: string; description?: string; coverUrl?: string }) => data,
-  )
+  .validator((data: { id?: string; name: string; description?: string; coverUrl?: string }) => data)
   .handler(async ({ data }) => {
     const user = await getEffectiveUser();
 
@@ -674,14 +670,23 @@ export const updateArtistProfileFn = createServerFn({ method: "POST" })
       socialLinks,
     } = data;
 
-    const cleanUsername = username ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") : null;
+    const cleanUsername = username
+      ? username
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "")
+      : null;
 
     if (cleanUsername) {
       if (cleanUsername.length < 3 || cleanUsername.length > 15) {
-        throw new Error("Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores)");
+        throw new Error(
+          "Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores)",
+        );
       }
       if (!/^[a-z0-9_-]+$/.test(cleanUsername)) {
-        throw new Error("Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_)");
+        throw new Error(
+          "Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_)",
+        );
       }
       const existingArtist = await sql<{ id: string }[]>`
         SELECT id FROM artists WHERE lower(username) = ${cleanUsername} AND id != ${user.artistId} LIMIT 1
@@ -758,7 +763,7 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         durationSeconds: number;
         audioUrl?: string | undefined;
       }[];
-    }) => data
+    }) => data,
   )
   .handler(async ({ data }) => {
     const user = await getUserFromSession();
@@ -769,7 +774,11 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     const { release, songs } = data;
 
     const releaseId = crypto.randomUUID();
-    const baseSlug = release.title.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-") || "release";
+    const baseSlug =
+      release.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "-")
+        .replace(/-+/g, "-") || "release";
     const releaseSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
 
     const goLive = release.goLiveAt
@@ -823,7 +832,11 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         const song = songs[i];
         if (!song) continue;
         const trackId = crypto.randomUUID();
-        const songBaseSlug = song.title.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-") || "track";
+        const songBaseSlug =
+          song.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "-")
+            .replace(/-+/g, "-") || "track";
         const songSlug = `${songBaseSlug}-${Math.floor(100 + Math.random() * 900)}`;
 
         // Generate Plugg Track ID using the sequence (concurrency-safe)
@@ -881,7 +894,7 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           for (const job of createdTrackJobs) {
             if (!job.audioUrl) continue;
             const cleanKey = decodeURIComponent(
-              job.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, "")
+              job.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, ""),
             );
             const res = await processMasterAudio(cleanKey, job.trackId);
             if (!res.success) allSuccess = false;
@@ -909,177 +922,32 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
   });
 
 export const approveReleaseFn = createServerFn({ method: "POST" })
-  .validator(
-    (data: { releaseId: string; newReleaseDate?: string | undefined }) => data
-  )
+  .validator((data: { releaseId: string; newReleaseDate?: string | undefined }) => data)
   .handler(async ({ data }) => {
-    const user = await getUserFromSession();
-    if (!user) throw new Error("Authentication required");
-    const isSystemAdmin =
-      Boolean(user.isAdmin) ||
-      user.email === "zuri@plugg.fm" ||
-      user.email === "admin@plugg.fm" ||
-      user.email === "xsm@plugg.com";
-    if (!isSystemAdmin) {
-      throw new Error("Unauthorized: Administrator permissions required to approve tracks");
-    }
-
-    const { releaseId, newReleaseDate } = data;
-    const [release] = await sql<
-      {
-        id: string;
-        artistId: string;
-        title: string;
-        status: string;
-        releaseDate: string | Date;
-        goLiveAt: string | Date | null;
-        audioProcessingStatus: string;
-        reviewHistory: any;
-      }[]
-    >`
-      SELECT id, artist_id as "artistId", title, status, release_date as "releaseDate",
-             go_live_at as "goLiveAt", audio_processing_status as "audioProcessingStatus",
-             review_history as "reviewHistory"
-      FROM releases
-      WHERE id = ${releaseId}
-      LIMIT 1
-    `;
-    if (!release) throw new Error("Release not found");
-
-    if (release.audioProcessingStatus !== "completed") {
-      throw new Error("Cannot approve track while audio variants are still processing or failed.");
-    }
-
-    const currentKampalaToday = todayISO();
-    const existingReleaseDate =
-      release.releaseDate instanceof Date
-        ? release.releaseDate.toISOString().slice(0, 10)
-        : String(release.releaseDate || "");
-
-    let targetReleaseDate = existingReleaseDate;
-    let targetGoLive = release.goLiveAt
-      ? release.goLiveAt instanceof Date
-        ? release.goLiveAt
-        : new Date(release.goLiveAt)
-      : null;
-
-    // Check if the originally scheduled release date/time has already elapsed
-    const hasElapsed = targetGoLive
-      ? targetGoLive.getTime() <= Date.now()
-      : existingReleaseDate < currentKampalaToday;
-
-    if (hasElapsed) {
-      if (!newReleaseDate) {
-        throw new Error(
-          "The originally scheduled release date has elapsed while under review. A new valid future release date is required."
-        );
-      }
-      targetReleaseDate = newReleaseDate;
-      targetGoLive = new Date(goLiveAt(newReleaseDate));
-    } else if (newReleaseDate) {
-      targetReleaseDate = newReleaseDate;
-      targetGoLive = new Date(goLiveAt(newReleaseDate));
-    } else if (!targetGoLive) {
-      targetGoLive = new Date(goLiveAt(targetReleaseDate));
-    }
-
-    const history = Array.isArray(release.reviewHistory) ? release.reviewHistory : [];
-    history.push({
-      id: crypto.randomUUID(),
-      action: "approved",
-      timestamp: new Date().toISOString(),
-      actorId: user.id,
-      actorName: user.name,
+    const { getCookie } = await import("@tanstack/react-start/server");
+    const { reviewRelease } = await import("@/server/admin-review");
+    return reviewRelease(getCookie("plugg_session"), {
+      action: "approve",
+      releaseId: data.releaseId,
+      ...(data.newReleaseDate ? { date: data.newReleaseDate } : {}),
     });
-
-    await sql`
-      UPDATE releases
-      SET
-        status = 'scheduled',
-        release_date = ${targetReleaseDate},
-        go_live_at = ${targetGoLive},
-        reviewed_at = now(),
-        reviewer_id = ${user.id},
-        review_history = ${JSON.stringify(history)},
-        updated_at = now()
-      WHERE id = ${releaseId}
-    `;
-
-    return {
-      success: true,
-      releaseId,
-      status: "scheduled",
-      releaseDate: targetReleaseDate,
-      goLiveAt: targetGoLive.toISOString(),
-    };
   });
-
 export const requestChangesReleaseFn = createServerFn({ method: "POST" })
   .validator((data: { releaseId: string; feedback: string }) => data)
   .handler(async ({ data }) => {
-    const user = await getUserFromSession();
-    if (!user) throw new Error("Authentication required");
-    const isSystemAdmin =
-      Boolean(user.isAdmin) ||
-      user.email === "zuri@plugg.fm" ||
-      user.email === "admin@plugg.fm" ||
-      user.email === "xsm@plugg.com";
-    if (!isSystemAdmin) {
-      throw new Error("Unauthorized: Administrator permissions required to request changes");
-    }
-
-    const { releaseId, feedback } = data;
-    if (!feedback || !feedback.trim()) {
-      throw new Error("Written feedback explaining required changes is mandatory.");
-    }
-
-    const [release] = await sql<
-      { id: string; artistId: string; title: string; reviewHistory: any }[]
-    >`
-      SELECT id, artist_id as "artistId", title, review_history as "reviewHistory"
-      FROM releases
-      WHERE id = ${releaseId}
-      LIMIT 1
-    `;
-    if (!release) throw new Error("Release not found");
-
-    const history = Array.isArray(release.reviewHistory) ? release.reviewHistory : [];
-    history.push({
-      id: crypto.randomUUID(),
-      action: "changes_requested",
-      timestamp: new Date().toISOString(),
-      actorId: user.id,
-      actorName: user.name,
-      feedback: feedback.trim(),
+    const { getCookie } = await import("@tanstack/react-start/server");
+    const { reviewRelease } = await import("@/server/admin-review");
+    return reviewRelease(getCookie("plugg_session"), {
+      action: "request_changes",
+      releaseId: data.releaseId,
+      feedback: data.feedback,
     });
-
-    await sql`
-      UPDATE releases
-      SET
-        status = 'changes_required',
-        review_feedback = ${feedback.trim()},
-        reviewed_at = now(),
-        reviewer_id = ${user.id},
-        review_history = ${JSON.stringify(history)},
-        updated_at = now()
-      WHERE id = ${releaseId}
-    `;
-
-    return {
-      success: true,
-      releaseId,
-      status: "changes_required",
-      feedback: feedback.trim(),
-    };
   });
 
 export const resubmitReleaseFn = createServerFn({ method: "POST" })
   .validator(
-    (data: {
-      releaseId: string;
-      releaseDate?: string | undefined;
-      notes?: string | undefined;
-    }) => data
+    (data: { releaseId: string; releaseDate?: string | undefined; notes?: string | undefined }) =>
+      data,
   )
   .handler(async ({ data }) => {
     const user = await getUserFromSession();
@@ -1088,66 +956,42 @@ export const resubmitReleaseFn = createServerFn({ method: "POST" })
     }
 
     const { releaseId, releaseDate, notes } = data;
-    const [release] = await sql<
-      { id: string; artistId: string; reviewHistory: any; releaseDate: any }[]
-    >`
-      SELECT id, artist_id as "artistId", review_history as "reviewHistory", release_date as "releaseDate"
-      FROM releases
-      WHERE id = ${releaseId} AND artist_id = ${user.artistId}
-      LIMIT 1
-    `;
-    if (!release) throw new Error("Release not found or not owned by artist");
-
-    const targetDate =
-      releaseDate ||
-      (release.releaseDate instanceof Date
-        ? release.releaseDate.toISOString().slice(0, 10)
-        : String(release.releaseDate));
-    const targetGoLive = new Date(goLiveAt(targetDate));
-
-    const history = Array.isArray(release.reviewHistory) ? release.reviewHistory : [];
-    history.push({
-      id: crypto.randomUUID(),
-      action: "resubmitted",
-      timestamp: new Date().toISOString(),
-      actorId: user.id,
-      actorName: user.name,
-      feedback: notes || "Corrections applied and resubmitted by artist.",
+    return sql.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(734821,1)`;
+      const [release] =
+        await tx`SELECT id,status,release_date::text,review_history FROM releases WHERE id=${releaseId} AND artist_id=${user.artistId!} FOR UPDATE`;
+      if (!release || !["changes_required", "draft"].includes(release["status"]))
+        throw new Error("Only your draft or correction-requested release can be resubmitted.");
+      const [last] =
+        await tx`SELECT action FROM admin_audit_log WHERE target_type='release' AND target_id=${releaseId} AND action IN ('release.takedown','release.reinstate') ORDER BY id DESC LIMIT 1`;
+      if (last?.["action"] === "release.takedown")
+        throw new Error("This release is taken down. Contact an administrator.");
+      const { futureMidnight } = await import("@/server/admin-review");
+      const { decodeJson } = await import("@/components/admin/model");
+      const date = releaseDate || release["releaseDate"];
+      const [clock] = await tx<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+      const at = futureMidnight(date, clock!.now);
+      const raw = decodeJson(release["reviewHistory"]);
+      const history = Array.isArray(raw) ? raw : [];
+      history.push({
+        id: crypto.randomUUID(),
+        action: "resubmitted",
+        timestamp: clock!.now.toISOString(),
+        actorId: user.id,
+        actorName: user.name,
+        feedback: notes || "Corrections applied and resubmitted by artist.",
+      });
+      await tx`UPDATE releases SET status='under_review',release_date=${date},go_live_at=${at},review_submitted_at=now(),review_history=${tx.json(history)},updated_at=now() WHERE id=${releaseId}`;
+      return { success: true, releaseId, status: "under_review" };
     });
-
-    await sql`
-      UPDATE releases
-      SET
-        status = 'under_review',
-        release_date = ${targetDate},
-        go_live_at = ${targetGoLive},
-        review_submitted_at = now(),
-        review_history = ${JSON.stringify(history)},
-        updated_at = now()
-      WHERE id = ${releaseId}
-    `;
-
-    return { success: true, releaseId, status: "under_review" };
   });
 
 export const retryTrackProcessingFn = createServerFn({ method: "POST" })
   .validator((data: { trackId: string }) => data)
   .handler(async ({ data }) => {
-    const user = await getUserFromSession();
-    if (!user) throw new Error("Authentication required");
-
-    const { trackId } = data;
-    const [track] = await sql<{ id: string; audioUrl: string | null; releaseId: string }[]>`
-      SELECT id, audio_url as "audioUrl", release_id as "releaseId" FROM tracks WHERE id = ${trackId} LIMIT 1
-    `;
-    if (!track || !track.audioUrl) throw new Error("Track or audio file not found");
-
-    const { processMasterAudio } = await import("@/server/audio-processor");
-    const storageKey = decodeURIComponent(
-      track.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, "")
-    );
-    const result = await processMasterAudio(storageKey, track.id);
-    return result;
+    const { getCookie } = await import("@tanstack/react-start/server");
+    const { retryAudio } = await import("@/server/admin-retry");
+    return retryAudio(getCookie("plugg_session"), data.trackId, true);
   });
 
 export const updateReleaseFn = createServerFn({ method: "POST" })
@@ -1159,7 +1003,7 @@ export const updateReleaseFn = createServerFn({ method: "POST" })
         description?: string | undefined;
         coverUrl?: string | undefined;
       };
-    }) => data
+    }) => data,
   )
   .handler(async ({ data }) => {
     const user = await getUserFromSession();
@@ -1190,7 +1034,7 @@ export const updateTrackFn = createServerFn({ method: "POST" })
         producers?: string | undefined;
         lyrics?: string | undefined;
       };
-    }) => data
+    }) => data,
   )
   .handler(async ({ data }) => {
     const user = await getUserFromSession();
@@ -1224,6 +1068,9 @@ export const deleteReleaseFn = createServerFn({ method: "POST" })
     const artistId = user.artistId;
 
     await sql.begin(async (tx) => {
+      const [owned] =
+        await tx`SELECT id FROM releases WHERE id=${releaseId} AND artist_id=${artistId} FOR UPDATE`;
+      if (!owned) throw new Error("Release not found or not owned by artist");
       await tx`DELETE FROM release_tracks WHERE release_id = ${releaseId}`;
       await tx`
         DELETE FROM playlist_tracks 
@@ -1255,12 +1102,7 @@ export const deleteReleaseFn = createServerFn({ method: "POST" })
 
 export const upgradeToArtistFn = createServerFn({ method: "POST" })
   .validator(
-    (data: {
-      displayName: string;
-      location?: string;
-      bio?: string;
-      avatarKey?: string;
-    }) => data
+    (data: { displayName: string; location?: string; bio?: string; avatarKey?: string }) => data,
   )
   .handler(async ({ data }) => {
     const user = await getUserFromSession();
@@ -1269,7 +1111,11 @@ export const upgradeToArtistFn = createServerFn({ method: "POST" })
     const { displayName, location, bio, avatarKey } = data;
 
     const artistId = crypto.randomUUID();
-    const username = displayName.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-") || "artist";
+    const username =
+      displayName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "-")
+        .replace(/-+/g, "-") || "artist";
     const uniqueUsername = `${username}-${Math.floor(100 + Math.random() * 900)}`;
 
     await sql.begin(async (tx) => {

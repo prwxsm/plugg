@@ -3,7 +3,7 @@ import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server
 import sql from "./db";
 import type { User } from "@/data/types";
 
-const SESSION_COOKIE_NAME = "plugg_session";
+export const SESSION_COOKIE_NAME = "plugg_session";
 const SESSION_DURATION_DAYS = 30;
 
 export async function hashPassword(password: string): Promise<string> {
@@ -59,7 +59,7 @@ export async function getUserFromSession(): Promise<User | null> {
     }
 
     const [user] = await sql<(User & { isAdmin?: boolean })[]>`
-      SELECT u.id, u.name, u.username, u.email, u.account_type as "accountType", u.avatar_url as "avatarUrl", u.artist_id as "artistId", COALESCE(u.is_admin, false) as "isAdmin"
+      SELECT u.id, u.name, u.username, u.email, u.account_type as "accountType", u.avatar_url as "avatarUrl", u.artist_id as "artistId", EXISTS(SELECT 1 FROM admin_memberships m WHERE m.user_id=u.id AND m.active) as "isAdmin"
       FROM sessions s
       JOIN users u ON u.id = s.user_id
       WHERE s.id = ${sessionId} AND s.expires_at > now()
@@ -73,7 +73,7 @@ export async function getUserFromSession(): Promise<User | null> {
       return null;
     }
 
-    const isSystemAdmin = Boolean(user.isAdmin) || user.email === "zuri@plugg.fm" || user.email === "admin@plugg.fm" || user.email === "xsm@plugg.com";
+    const isSystemAdmin = user.isAdmin === true;
 
     return {
       id: user.id,

@@ -11,10 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button, Field, inputClass } from "@/components/plugg/primitives";
 import { cn } from "@/lib/utils";
-import {
-  requestPasswordResetCodeFn,
-  resetPasswordWithCodeFn,
-} from "@/server-fns/auth-functions";
+import { requestPasswordResetCodeFn, resetPasswordWithCodeFn } from "@/server-fns/auth-functions";
 
 interface ForgotPasswordModalProps {
   open: boolean;
@@ -73,12 +70,9 @@ export function ForgotPasswordModal({
 
     setLoading(true);
     try {
-      const res = await requestPasswordResetCodeFn({ data: { email: cleanEmail } });
+      await requestPasswordResetCodeFn({ data: { email: cleanEmail } });
       setStep("reset");
-      toast.success(
-        `Verification code sent to ${cleanEmail}!${res.code ? ` (Test code: ${res.code})` : ""}`,
-        { duration: 8000 }
-      );
+      toast.success(`Verification code sent to ${cleanEmail}.`, { duration: 8000 });
     } catch (err: any) {
       setError(err?.message || "Could not request password reset code. Please try again.");
     } finally {
@@ -146,7 +140,8 @@ export function ForgotPasswordModal({
                 </DialogTitle>
               </div>
               <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                Enter your account email address. We will send you a 6-digit verification code to reset your password.
+                Password recovery is temporarily unavailable while secure email delivery is
+                configured. You can still change your password when signed in.
               </DialogDescription>
             </DialogHeader>
 
@@ -208,7 +203,8 @@ export function ForgotPasswordModal({
                 </DialogTitle>
               </div>
               <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                Code sent to <span className="font-medium text-foreground">{email}</span>. Enter the code and choose a new password.
+                Code sent to <span className="font-medium text-foreground">{email}</span>. Enter the
+                code and choose a new password.
               </DialogDescription>
             </DialogHeader>
 
@@ -226,7 +222,7 @@ export function ForgotPasswordModal({
                 placeholder="123456"
                 className={cn(
                   inputClass,
-                  "text-center font-mono text-lg tracking-[0.3em] font-semibold"
+                  "text-center font-mono text-lg tracking-[0.3em] font-semibold",
                 )}
                 required
                 autoFocus
@@ -339,7 +335,8 @@ export function ForgotPasswordModal({
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-foreground">Password reset successfully</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Your password has been updated. You can now sign in with your email or username and new password.
+                Your password has been updated. You can now sign in with your email or username and
+                new password.
               </p>
             </div>
             <div className="pt-2">

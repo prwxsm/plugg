@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import sql from "@/lib/db";
-import { hashPassword, verifyPassword, createSession, clearSession, getUserFromSession } from "@/lib/auth";
+import {
+  hashPassword,
+  verifyPassword,
+  createSession,
+  clearSession,
+  getUserFromSession,
+} from "@/lib/auth";
 
 export const registerUser = createServerFn({ method: "POST" })
   .validator(
@@ -138,7 +144,14 @@ export const loginUser = createServerFn({ method: "POST" })
     const normalized = rawIdentifier.toLowerCase();
 
     const [user] = await sql<
-      { id: string; name: string; email: string; passwordHash: string | null; accountType: "listener" | "artist"; artistId: string | null }[]
+      {
+        id: string;
+        name: string;
+        email: string;
+        passwordHash: string | null;
+        accountType: "listener" | "artist";
+        artistId: string | null;
+      }[]
     >`
       SELECT u.id, u.name, u.email, u.password_hash, u.account_type, u.artist_id
       FROM users u
@@ -168,97 +181,20 @@ export const loginUser = createServerFn({ method: "POST" })
     };
   });
 
+// Disabled until a verified out-of-band delivery provider is configured. Never return reset codes.
 export const requestPasswordResetCodeFn = createServerFn({ method: "POST" })
   .validator((data: { email: string }) => data)
-  .handler(async ({ data }) => {
-    const cleanEmail = (data.email || "").trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      throw new Error("Please enter a valid email address");
-    }
-
-    const [user] = await sql<{ id: string }[]>`
-      SELECT id FROM users WHERE lower(email) = ${cleanEmail} LIMIT 1
-    `;
-
-    if (!user) {
-      throw new Error("No account found with this email address");
-    }
-
-    await sql`
-      CREATE TABLE IF NOT EXISTS password_resets (
-        id TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        code TEXT NOT NULL,
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-      );
-    `;
-
-    await sql`DELETE FROM password_resets WHERE lower(email) = ${cleanEmail}`;
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    await sql`
-      INSERT INTO password_resets (id, email, code, expires_at)
-      VALUES (${crypto.randomUUID()}, ${cleanEmail}, ${code}, ${expiresAt})
-    `;
-
-    return {
-      success: true,
-      email: cleanEmail,
-      code,
-    };
+  .handler(async () => {
+    throw new Error("Password recovery is temporarily unavailable. Contact the platform owner.");
   });
-
 export const resetPasswordWithCodeFn = createServerFn({ method: "POST" })
   .validator(
-    (data: {
-      email: string;
-      code: string;
-      newPassword: string;
-      confirmPassword: string;
-    }) => data,
+    (data: { email: string; code: string; newPassword: string; confirmPassword: string }) => data,
   )
-  .handler(async ({ data }) => {
-    const cleanEmail = (data.email || "").trim().toLowerCase();
-    const cleanCode = (data.code || "").trim();
-    const { newPassword, confirmPassword } = data;
-
-    if (!cleanEmail || !cleanCode || !newPassword || !confirmPassword) {
-      throw new Error("All fields are required");
-    }
-
-    if (newPassword !== confirmPassword) {
-      throw new Error("Passwords do not match");
-    }
-
-    if (newPassword.length < 6) {
-      throw new Error("Password must be at least 6 characters long");
-    }
-
-    const [record] = await sql<{ id: string }[]>`
-      SELECT id FROM password_resets
-      WHERE lower(email) = ${cleanEmail} AND code = ${cleanCode} AND expires_at > now()
-      LIMIT 1
-    `;
-
-    if (!record) {
-      throw new Error("Invalid or expired verification code. Please request a new code.");
-    }
-
-    const hashedPassword = await hashPassword(newPassword);
-
-    await sql`
-      UPDATE users
-      SET password_hash = ${hashedPassword}, updated_at = now()
-      WHERE lower(email) = ${cleanEmail}
-    `;
-
-    await sql`DELETE FROM password_resets WHERE lower(email) = ${cleanEmail}`;
-
-    return { success: true };
+  .handler(async () => {
+    throw new Error(
+      "Password recovery is temporarily unavailable. Sign in to change your password securely.",
+    );
   });
 
 export const logoutUser = createServerFn({ method: "POST" }).handler(async () => {
@@ -287,7 +223,12 @@ export const updateUserProfileFn = createServerFn({ method: "POST" })
 
     const { name, username, email, avatarUrl } = data;
     const cleanName = name?.trim();
-    const cleanUsername = username ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") : null;
+    const cleanUsername = username
+      ? username
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "")
+      : null;
     const cleanEmail = email ? email.trim().toLowerCase() : null;
 
     if (cleanEmail && cleanEmail !== user.email.toLowerCase()) {
@@ -305,10 +246,14 @@ export const updateUserProfileFn = createServerFn({ method: "POST" })
 
     if (cleanUsername) {
       if (cleanUsername.length < 3 || cleanUsername.length > 15) {
-        throw new Error("Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores)");
+        throw new Error(
+          "Username must be between 3 and 15 characters (lowercase letters, numbers, hyphens, underscores)",
+        );
       }
       if (!/^[a-z0-9_-]+$/.test(cleanUsername)) {
-        throw new Error("Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_)");
+        throw new Error(
+          "Username can only contain lowercase letters, numbers, hyphens (-), and underscores (_)",
+        );
       }
       const existingUser = await sql<{ id: string }[]>`
         SELECT id FROM users WHERE lower(username) = ${cleanUsername} AND id != ${user.id} LIMIT 1
@@ -388,11 +333,7 @@ export const verifyCurrentPasswordFn = createServerFn({ method: "POST" })
 
 export const changeUserPasswordFn = createServerFn({ method: "POST" })
   .validator(
-    (data: {
-      oldPassword?: string;
-      newPassword?: string;
-      confirmPassword?: string;
-    }) => data,
+    (data: { oldPassword?: string; newPassword?: string; confirmPassword?: string }) => data,
   )
   .handler(async ({ data }) => {
     const user = await getUserFromSession();
@@ -475,23 +416,21 @@ export const checkUsernameAvailabilityFn = createServerFn({ method: "GET" })
     return { available: true };
   });
 
-export const deleteUserAccountFn = createServerFn({ method: "POST" })
-  .handler(async () => {
-    const user = await getUserFromSession();
-    if (!user) {
-      throw new Error("You must be logged in to delete your account");
+export const deleteUserAccountFn = createServerFn({ method: "POST" }).handler(async () => {
+  const user = await getUserFromSession();
+  if (!user) {
+    throw new Error("You must be logged in to delete your account");
+  }
+
+  await sql.begin(async (tx) => {
+    // If user is an artist, delete artist profile (cascades releases, tracks, etc.)
+    if (user.artistId) {
+      await tx`DELETE FROM artists WHERE id = ${user.artistId}`;
     }
-
-    await sql.begin(async (tx) => {
-      // If user is an artist, delete artist profile (cascades releases, tracks, etc.)
-      if (user.artistId) {
-        await tx`DELETE FROM artists WHERE id = ${user.artistId}`;
-      }
-      // Delete user (cascades playlists, likes, follows, sessions, files)
-      await tx`DELETE FROM users WHERE id = ${user.id}`;
-    });
-
-    await clearSession();
-    return { success: true };
+    // Delete user (cascades playlists, likes, follows, sessions, files)
+    await tx`DELETE FROM users WHERE id = ${user.id}`;
   });
 
+  await clearSession();
+  return { success: true };
+});

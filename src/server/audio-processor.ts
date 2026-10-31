@@ -9,6 +9,45 @@ import { inspectAudioHeader } from "@/lib/audio-validation";
 
 const execAsync = promisify(exec);
 
+/**
+ * Resolves the path to the ffmpeg or ffprobe executable.
+ * Checks environment overrides, local user bins, standard system paths, and system PATH.
+ */
+function getBinaryPath(name: "ffmpeg" | "ffprobe"): string {
+  const envVar = name === "ffmpeg" ? process.env["FFMPEG_PATH"] : process.env["FFPROBE_PATH"];
+  if (envVar && fs.existsSync(envVar)) {
+    return envVar;
+  }
+  const homeDir = process.env["HOME"] || "";
+  const candidates = [
+    path.join(homeDir, ".local/bin", name),
+    `/home/prwxsm/.local/bin/${name}`,
+    `/usr/local/bin/${name}`,
+    `/usr/bin/${name}`,
+    `/bin/${name}`,
+  ];
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return name;
+}
+
+function getExecutionEnv(): NodeJS.ProcessEnv {
+  const homeDir = process.env["HOME"] || "";
+  const localBin = path.join(homeDir, ".local/bin");
+  const defaultPath = `${localBin}:/home/prwxsm/.local/bin:/usr/local/bin:/usr/bin:/bin`;
+  return {
+    ...process.env,
+    PATH: process.env["PATH"] ? `${defaultPath}:${process.env["PATH"]}` : defaultPath,
+  };
+}
+
+async function runExec(cmd: string): Promise<{ stdout: string; stderr: string }> {
+  return execAsync(cmd, { env: getExecutionEnv() });
+}
+
 export interface ProcessAudioResult {
   success: boolean;
   error?: string;
@@ -16,26 +55,293 @@ export interface ProcessAudioResult {
   technicalValidation: TechnicalValidation;
 }
 
+interface FfprobeOutput {
+  streams?: {
+    codec_name?: string;
+    codec_type?: string;
+    sample_rate?: string | number;
+    channels?: number;
+    bits_per_sample?: number;
+    bits_per_raw_sample?: string | number;
+    bit_rate?: string | number;
+    duration?: string | number;
+  }[];
+  format?: {
+    format_name?: string;
+    duration?: string | number;
+    size?: string | number;
+    bit_rate?: string | number;
+  };
+}
+
 /**
- * Validates and transcodes a master audio file (WAV or FLAC) into streaming and download variants:
+ * Inspects and validates audio technical specifications using FFprobe and binary header checks.
+ */
+export async function probeAndValidateAudio(filePath: string): Promise<{
+  valid: boolean;
+  error?: string | undefined;
+  warning?: string | undefined;
+  qualityWarning?: string | undefined;
+  properties: TechnicalValidation;
+}> {
+  // 1. First run fast binary header inspection
+  let headerValidation: ReturnType<typeof inspectAudioHeader> | null = null;
+  try {
+    const headerBuffer = Buffer.alloc(65536);
+    const fd = await fs.promises.open(filePath, "r");
+    const { bytesRead } = await fd.read(headerBuffer, 0, 65536, 0);
+    await fd.close();
+    headerValidation = inspectAudioHeader(headerBuffer.subarray(0, bytesRead));
+  } catch (err) {
+    console.warn("Fast header inspection read error:", err);
+  }
+
+  // 2. Run FFprobe for deep stream inspection and validation
+  let ffprobeData: FfprobeOutput | null = null;
+  try {
+    const ffprobeBin = getBinaryPath("ffprobe");
+    const { stdout } = await runExec(
+      `"${ffprobeBin}" -v error -print_format json -show_format -show_streams "${filePath}"`,
+    );
+    ffprobeData = JSON.parse(stdout) as FfprobeOutput;
+  } catch (probeErr: any) {
+    return {
+      valid: false,
+      error: `Audio file inspection failed: File may be corrupted or in an unsupported format. (${probeErr.message || probeErr})`,
+      properties: { format: "unknown", valid: false },
+    };
+  }
+
+  const audioStream = ffprobeData.streams?.find((s) => s.codec_type === "audio");
+  if (!audioStream) {
+    return {
+      valid: false,
+      error: "No audio stream found in the uploaded file.",
+      properties: { format: "unknown", valid: false },
+    };
+  }
+
+  const codec = (audioStream.codec_name || "").toLowerCase();
+  const formatName = (ffprobeData.format?.format_name || "").toLowerCase();
+
+  const isWav = formatName.includes("wav") || codec.startsWith("pcm_");
+  const isFlac = formatName.includes("flac") || codec === "flac";
+  const isMp3 = formatName.includes("mp3") || codec === "mp3";
+
+  if (!isWav && !isFlac && !isMp3) {
+    return {
+      valid: false,
+      error: `Accepted formats are WAV, FLAC, or MP3 only. Detected format: ${codec || formatName || "unknown"}.`,
+      properties: { format: codec || formatName, valid: false },
+    };
+  }
+
+  const sampleRate = parseInt(String(audioStream.sample_rate || 0), 10);
+  const channels = audioStream.channels || 0;
+  const isStereo = channels >= 2;
+
+  const durationSeconds = Math.round(
+    parseFloat(String(ffprobeData.format?.duration || audioStream.duration || 0)),
+  );
+
+  // Bit depth for lossless PCM / FLAC
+  let bitDepth: number | undefined;
+  if (isWav || isFlac) {
+    const rawBits = parseInt(
+      String(audioStream.bits_per_raw_sample || audioStream.bits_per_sample || 0),
+      10,
+    );
+    bitDepth = rawBits > 0 ? rawBits : headerValidation?.properties.bitDepth || 16;
+  }
+
+  // Bitrate calculation
+  const rawBitrateBps = parseInt(
+    String(ffprobeData.format?.bit_rate || audioStream.bit_rate || 0),
+    10,
+  );
+  let bitrateKbps: number | undefined;
+  if (rawBitrateBps > 0) {
+    bitrateKbps = Math.round(rawBitrateBps / 1000);
+  } else if (headerValidation?.properties.bitrateKbps) {
+    bitrateKbps = headerValidation.properties.bitrateKbps;
+  }
+
+  // Check 1: Sample Rate >= 44.1 kHz
+  if (sampleRate < 44100) {
+    return {
+      valid: false,
+      error: `Sample rate must be at least 44.1 kHz. Detected: ${(sampleRate / 1000).toFixed(1)} kHz. Please upload a high-quality master.`,
+      properties: {
+        format: isWav ? "WAV" : isFlac ? "FLAC" : "MP3",
+        sampleRate,
+        channels,
+        durationSeconds,
+        bitDepth,
+        bitrateKbps,
+        valid: false,
+      },
+    };
+  }
+
+  // Check 2: Stereo channels (>= 2)
+  if (channels < 2) {
+    return {
+      valid: false,
+      error: "Master tracks must be in Stereo (2 channels). Mono recordings are not accepted.",
+      properties: {
+        format: isWav ? "WAV" : isFlac ? "FLAC" : "MP3",
+        sampleRate,
+        channels,
+        durationSeconds,
+        bitDepth,
+        bitrateKbps,
+        valid: false,
+      },
+    };
+  }
+
+  // Check 3: WAV and FLAC minimum bit-depth (>= 16-bit)
+  if (isWav || isFlac) {
+    if (bitDepth !== undefined && bitDepth < 16) {
+      return {
+        valid: false,
+        error: `Bit depth must be at least 16-bit. Detected: ${bitDepth}-bit. 8-bit audio is not accepted.`,
+        properties: {
+          format: isWav ? "WAV" : "FLAC",
+          sampleRate,
+          channels,
+          bitDepth,
+          durationSeconds,
+          isStereo,
+          isLossless: true,
+          is24Bit: false,
+          valid: false,
+        },
+      };
+    }
+
+    const is24Bit = (bitDepth || 0) >= 24;
+    let warning: string | undefined;
+    if (!is24Bit) {
+      warning = "Master is 16-bit. Recommended: 24-bit original studio master for optimal sound dynamics.";
+    }
+
+    return {
+      valid: true,
+      warning,
+      properties: {
+        format: isWav ? "WAV" : "FLAC",
+        sampleRate,
+        channels,
+        bitDepth,
+        durationSeconds,
+        isStereo,
+        isLossless: true,
+        is24Bit,
+        valid: true,
+      },
+    };
+  }
+
+  // Check 4: MP3 Validation (No bit-depth check!)
+  const effectiveBitrate = bitrateKbps || headerValidation?.properties.bitrateKbps || 0;
+
+  if (effectiveBitrate < 192) {
+    return {
+      valid: false,
+      error: `MP3 bitrate is below 192 kbps (${effectiveBitrate} kbps detected). Plugg requires at least 192 kbps for MP3 uploads. Please upload a higher quality audio file (256–320 kbps recommended, or lossless WAV/FLAC).`,
+      properties: {
+        format: "MP3",
+        sampleRate,
+        channels,
+        durationSeconds,
+        bitrateKbps: effectiveBitrate,
+        isStereo,
+        isLossless: false,
+        is24Bit: false,
+        valid: false,
+      },
+    };
+  }
+
+  // MP3 192–255 kbps: Accept with quality-review flag
+  if (effectiveBitrate < 256) {
+    const warning = `MP3 bitrate is ${effectiveBitrate} kbps. Accepted with quality-review flag. Recommended: 256–320 kbps or lossless WAV/FLAC for best sound dynamics.`;
+    const qualityWarning = `MP3 ${effectiveBitrate} kbps (Quality review flag)`;
+    return {
+      valid: true,
+      warning,
+      qualityWarning,
+      properties: {
+        format: "MP3",
+        sampleRate,
+        channels,
+        durationSeconds,
+        bitrateKbps: effectiveBitrate,
+        isStereo,
+        isLossless: false,
+        is24Bit: false,
+        warning,
+        qualityWarning,
+        valid: true,
+      },
+    };
+  }
+
+  // MP3 256–320 kbps: Accepted (recommended)
+  return {
+    valid: true,
+    properties: {
+      format: "MP3",
+      sampleRate,
+      channels,
+      durationSeconds,
+      bitrateKbps: effectiveBitrate,
+      isStereo,
+      isLossless: false,
+      is24Bit: false,
+      valid: true,
+    },
+  };
+}
+
+/**
+ * Validates a generated audio variant with FFprobe to confirm it is valid and playable.
+ */
+async function verifyVariantPlayable(variantPath: string): Promise<boolean> {
+  try {
+    const stat = await fs.promises.stat(variantPath);
+    if (stat.size === 0) return false;
+    const ffprobeBin = getBinaryPath("ffprobe");
+    const { stdout } = await runExec(
+      `"${ffprobeBin}" -v error -print_format json -show_streams "${variantPath}"`,
+    );
+    const data = JSON.parse(stdout) as FfprobeOutput;
+    const audioStream = data.streams?.find((s) => s.codec_type === "audio");
+    return Boolean(audioStream && Number(audioStream.duration || 1) > 0);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates and transcodes a master audio file (WAV, FLAC, or MP3) into streaming and download variants:
  * Streaming:
- *  - stream_64k: Opus 64 kbps
- *  - stream_96k: Opus 96 kbps
- *  - stream_160k: Opus 160 kbps
- *  - stream_256k: AAC 256 kbps
+ *  - stream_64k: Opus 64 kbps (.opus)
+ *  - stream_96k: Opus 96 kbps (.opus)
+ *  - stream_160k: Opus 160 kbps (.opus)
+ *  - stream_256k: AAC 256 kbps (.m4a)
  * Downloads:
- *  - download_96k: AAC 96 kbps
- *  - download_160k: AAC 160 kbps
- *  - download_256k: AAC 256 kbps
+ *  - download_96k: AAC 96 kbps (.m4a)
+ *  - download_160k: AAC 160 kbps (.m4a)
+ *  - download_256k: AAC 256 kbps (.m4a)
  */
 export async function processMasterAudio(
   masterStorageKey: string,
-  trackId: string
+  trackId: string,
+  persist = true,
 ): Promise<ProcessAudioResult> {
-  const baseDir = path.resolve(
-    process.cwd(),
-    process.env["STORAGE_DIR"] || ".storage/uploads"
-  );
+  const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
 
   const cleanMasterKey = path.normalize(masterStorageKey).replace(/^(\.\.(\/|\\|$))+/, "");
   const masterFilePath = path.join(baseDir, cleanMasterKey);
@@ -44,15 +350,20 @@ export async function processMasterAudio(
     throw new Error(`Master audio file not found at ${masterFilePath}`);
   }
 
-  // 1. Read first 8KB to inspect binary header
-  const headerBuffer = Buffer.alloc(8192);
-  const fd = await fs.promises.open(masterFilePath, "r");
-  const { bytesRead } = await fd.read(headerBuffer, 0, 8192, 0);
-  await fd.close();
-
-  const validation = inspectAudioHeader(headerBuffer.subarray(0, bytesRead));
+  // 1. Technical inspection and validation via FFprobe + header inspection
+  const validation = await probeAndValidateAudio(masterFilePath);
 
   if (!validation.valid) {
+    if (persist) {
+      await sql`
+        UPDATE tracks
+        SET
+          audio_processing_status = 'failed',
+          technical_validation = ${validation.properties ? sql.json(validation.properties as any) : sql`'{}'::jsonb`},
+          updated_at = now()
+        WHERE id = ${trackId}
+      `;
+    }
     return {
       success: false,
       error: validation.error || "Master audio failed technical requirements",
@@ -70,13 +381,20 @@ export async function processMasterAudio(
 
   const storage = getStorageProvider();
   const variants: Record<string, AudioVariantInfo> = {};
+  const generatedFiles: string[] = [];
 
   try {
+    const ffmpegBin = getBinaryPath("ffmpeg");
+
     // 3. Generate Streaming variants
     // 64k Opus
     const s64Key = `${variantsRelDir}/stream_64k.opus`;
     const s64Path = path.join(baseDir, s64Key);
-    await execAsync(`ffmpeg -y -i "${masterFilePath}" -c:a libopus -b:a 64k -vbr on "${s64Path}"`);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a libopus -b:a 64k -vbr on "${s64Path}"`);
+    generatedFiles.push(s64Path);
+    if (!(await verifyVariantPlayable(s64Path))) {
+      throw new Error("Generated 64k Opus variant failed playback verification");
+    }
     const s64Stat = await fs.promises.stat(s64Path);
     variants["stream_64k"] = {
       storageKey: s64Key,
@@ -90,7 +408,11 @@ export async function processMasterAudio(
     // 96k Opus
     const s96Key = `${variantsRelDir}/stream_96k.opus`;
     const s96Path = path.join(baseDir, s96Key);
-    await execAsync(`ffmpeg -y -i "${masterFilePath}" -c:a libopus -b:a 96k -vbr on "${s96Path}"`);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a libopus -b:a 96k -vbr on "${s96Path}"`);
+    generatedFiles.push(s96Path);
+    if (!(await verifyVariantPlayable(s96Path))) {
+      throw new Error("Generated 96k Opus variant failed playback verification");
+    }
     const s96Stat = await fs.promises.stat(s96Path);
     variants["stream_96k"] = {
       storageKey: s96Key,
@@ -104,7 +426,13 @@ export async function processMasterAudio(
     // 160k Opus
     const s160Key = `${variantsRelDir}/stream_160k.opus`;
     const s160Path = path.join(baseDir, s160Key);
-    await execAsync(`ffmpeg -y -i "${masterFilePath}" -c:a libopus -b:a 160k -vbr on "${s160Path}"`);
+    await runExec(
+      `"${ffmpegBin}" -y -i "${masterFilePath}" -c:a libopus -b:a 160k -vbr on "${s160Path}"`,
+    );
+    generatedFiles.push(s160Path);
+    if (!(await verifyVariantPlayable(s160Path))) {
+      throw new Error("Generated 160k Opus variant failed playback verification");
+    }
     const s160Stat = await fs.promises.stat(s160Path);
     variants["stream_160k"] = {
       storageKey: s160Key,
@@ -115,10 +443,14 @@ export async function processMasterAudio(
       type: "stream",
     };
 
-    // 256k AAC (used for both very-high streaming and very-high downloads)
+    // 256k AAC (used for high streaming & 256k download)
     const aac256Key = `${variantsRelDir}/aac_256k.m4a`;
     const aac256Path = path.join(baseDir, aac256Key);
-    await execAsync(`ffmpeg -y -i "${masterFilePath}" -c:a aac -b:a 256k "${aac256Path}"`);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a aac -b:a 256k "${aac256Path}"`);
+    generatedFiles.push(aac256Path);
+    if (!(await verifyVariantPlayable(aac256Path))) {
+      throw new Error("Generated 256k AAC variant failed playback verification");
+    }
     const aac256Stat = await fs.promises.stat(aac256Path);
     variants["stream_256k"] = {
       storageKey: aac256Key,
@@ -141,7 +473,11 @@ export async function processMasterAudio(
     // 96k AAC
     const d96Key = `${variantsRelDir}/download_96k.m4a`;
     const d96Path = path.join(baseDir, d96Key);
-    await execAsync(`ffmpeg -y -i "${masterFilePath}" -c:a aac -b:a 96k "${d96Path}"`);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a aac -b:a 96k "${d96Path}"`);
+    generatedFiles.push(d96Path);
+    if (!(await verifyVariantPlayable(d96Path))) {
+      throw new Error("Generated 96k AAC variant failed playback verification");
+    }
     const d96Stat = await fs.promises.stat(d96Path);
     variants["download_96k"] = {
       storageKey: d96Key,
@@ -155,7 +491,11 @@ export async function processMasterAudio(
     // 160k AAC
     const d160Key = `${variantsRelDir}/download_160k.m4a`;
     const d160Path = path.join(baseDir, d160Key);
-    await execAsync(`ffmpeg -y -i "${masterFilePath}" -c:a aac -b:a 160k "${d160Path}"`);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a aac -b:a 160k "${d160Path}"`);
+    generatedFiles.push(d160Path);
+    if (!(await verifyVariantPlayable(d160Path))) {
+      throw new Error("Generated 160k AAC variant failed playback verification");
+    }
     const d160Stat = await fs.promises.stat(d160Path);
     variants["download_160k"] = {
       storageKey: d160Key,
@@ -167,15 +507,18 @@ export async function processMasterAudio(
     };
 
     // Update database records
-    await sql`
-      UPDATE tracks
-      SET
-        audio_processing_status = 'completed',
-        technical_validation = ${JSON.stringify(validation.properties)},
-        audio_variants = ${JSON.stringify(variants)},
-        updated_at = now()
-      WHERE id = ${trackId}
-    `;
+    if (persist) {
+      await sql`
+        UPDATE tracks
+        SET
+          audio_processing_status = 'completed',
+          technical_validation = ${validation.properties ? sql.json(validation.properties as any) : sql`'{}'::jsonb`},
+          audio_variants = ${sql.json(variants as any)},
+          duration_seconds = COALESCE(NULLIF(${validation.properties.durationSeconds || 0}, 0), duration_seconds),
+          updated_at = now()
+        WHERE id = ${trackId}
+      `;
+    }
 
     return {
       success: true,
@@ -184,14 +527,27 @@ export async function processMasterAudio(
     };
   } catch (err: any) {
     console.error(`Audio processing error for track ${trackId}:`, err);
-    await sql`
-      UPDATE tracks
-      SET
-        audio_processing_status = 'failed',
-        technical_validation = ${JSON.stringify(validation.properties)},
-        updated_at = now()
-      WHERE id = ${trackId}
-    `;
+
+    // Clean up partial variant files on failure to prevent corrupted outputs
+    for (const f of generatedFiles) {
+      try {
+        if (fs.existsSync(f)) await fs.promises.unlink(f);
+      } catch (cleanErr) {
+        console.warn(`Failed to clean up variant file ${f}:`, cleanErr);
+      }
+    }
+
+    if (persist) {
+      await sql`
+        UPDATE tracks
+        SET
+          audio_processing_status = 'failed',
+          technical_validation = ${validation?.properties ? sql.json(validation.properties as any) : sql`'{}'::jsonb`},
+          updated_at = now()
+        WHERE id = ${trackId}
+      `;
+    }
+
     return {
       success: false,
       error: err.message || "Audio transcoding failed",

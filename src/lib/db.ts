@@ -1,8 +1,12 @@
 import "dotenv/config";
 import postgres from "postgres";
 
-const connectionString =
-  process.env["DATABASE_URL"] || "postgres://prwxsm:plugg_dev@localhost:5432/plugg";
+const connectionString = process.env["DATABASE_URL"];
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL must be configured in the server environment. No fallback database is used.",
+  );
+}
 
 // Use a global variable in development to avoid leaking connections on hot-reload
 declare global {

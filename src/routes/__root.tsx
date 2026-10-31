@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -74,7 +75,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  loader: async () => {
+  loader: async ({ location }) => {
+    if (location.pathname === "/admin" || location.pathname.startsWith("/admin/")) return null;
     try {
       return await getInitialData();
     } catch (err) {
@@ -130,6 +132,12 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const initialData = Route.useLoaderData();
+  const isAdmin = useRouterState({
+    select: (state) =>
+      state.location.pathname === "/admin" || state.location.pathname.startsWith("/admin/"),
+  });
+
+  if (isAdmin) return <Outlet />;
 
   return (
     <QueryClientProvider client={queryClient}>

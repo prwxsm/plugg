@@ -1,3 +1,4 @@
+import { startPublicationWorker } from "./server/publication-worker";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -51,6 +52,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      startPublicationWorker();
       const url = new URL(request.url);
 
       // Route custom API endpoints

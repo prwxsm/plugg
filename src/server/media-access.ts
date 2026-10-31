@@ -1,0 +1,40 @@
+import sql from "../lib/db.ts";
+/** Audio stays public only while its release and track are published. */
+export async function canReadAudio(request: Request, key: string, connection: typeof sql = sql) {
+  const cookie = request.headers
+    .get("cookie")
+    ?.split(";")
+    .map((v) => v.trim())
+    .find((v) => v.startsWith("plugg_session="))
+    ?.slice("plugg_session=".length);
+  return connection.begin("read only", async (tx) => {
+    const tracks =
+      await tx`SELECT t.artist_id,t.published,r.status FROM tracks t JOIN releases r ON r.id=t.release_id
+   WHERE t.audio_url IN (${"/api/stream/" + encodeURIComponent(key)},${"/api/file/" + encodeURIComponent(key)},${"/api/stream/" + key},${"/api/file/" + key})
+   OR starts_with(${key},'variants/'||t.id||'/')`;
+    if (tracks.some((t) => t["published"] && t["status"] === "published")) return true;
+    if (!cookie) return false;
+    const [user] =
+      await tx`SELECT u.id,u.artist_id,m.role FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN admin_memberships m ON m.user_id=u.id AND m.active WHERE s.id=${cookie} AND s.expires_at>now()`;
+    if (!user) return false;
+    if (tracks.length)
+      return tracks.some(
+        (t) =>
+          t["artistId"] === user["artistId"] ||
+          ["super_admin", "admin"].includes(user["role"]) ||
+          (user["role"] === "moderator" &&
+            ["under_review", "changes_required"].includes(t["status"])),
+      );
+    const [file] =
+      await tx`SELECT id FROM files WHERE storage_key=${key} AND owner_id=${user["id"]}`;
+    return !!file;
+  });
+}
+
+/** Do not allow an alternate /api/file URL or misleading extension to bypass audio access checks. */
+export async function isStoredAudio(key: string) {
+  const [record] = await sql`SELECT
+    EXISTS(SELECT 1 FROM files WHERE storage_key=${key} AND mime_type LIKE 'audio/%') OR
+    EXISTS(SELECT 1 FROM tracks t WHERE t.audio_url IN (${"/api/stream/" + encodeURIComponent(key)},${"/api/file/" + encodeURIComponent(key)},${"/api/stream/" + key},${"/api/file/" + key}) OR starts_with(${key},'variants/'||t.id||'/')) AS audio`;
+  return record?.["audio"] === true;
+}

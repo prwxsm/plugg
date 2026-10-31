@@ -55,12 +55,16 @@ export interface TechnicalValidation {
   bitDepth?: number | undefined;
   channels?: number | undefined;
   durationSeconds?: number | undefined;
+  bitrateKbps?: number | undefined;
   isStereo?: boolean | undefined;
   isLossless?: boolean | undefined;
   is24Bit?: boolean | undefined;
+  isVbr?: boolean | undefined;
   valid?: boolean | undefined;
   notes?: string | undefined;
   error?: string | undefined;
+  warning?: string | undefined;
+  qualityWarning?: string | undefined;
 }
 
 export interface AudioVariantInfo {

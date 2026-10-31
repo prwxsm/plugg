@@ -103,7 +103,7 @@ export class LocalStorageProvider implements StorageProvider {
   getUrl(key: string): string {
     // If it's an audio file, route through the streaming API with byte-range support
     const ext = path.extname(key).toLowerCase();
-    if ([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"].includes(ext)) {
+    if ([".mp3", ".wav", ".ogg", ".opus", ".m4a", ".aac", ".flac"].includes(ext)) {
       return `/api/stream/${encodeURIComponent(key)}`;
     }
     return `/api/file/${encodeURIComponent(key)}`;

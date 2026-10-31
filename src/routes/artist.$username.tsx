@@ -53,12 +53,12 @@ function ArtistPage() {
             className="h-24 w-24 rounded-full object-cover ring-4 ring-background sm:h-32 sm:w-32"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-eyebrow">Artist</p>
+            <p className="text-eyebrow">{artist.verified ? "Verified Plugg Artist" : "Artist"}</p>
             <div className="mt-1 flex items-start">
               <h1 className="inline-flex flex-wrap items-start gap-1.5 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
                 <span className="truncate">{artist.displayName}</span>
                 {artist.verified ? (
-                  <span className="relative -top-0.5 sm:-top-1 inline-flex shrink-0 self-start" title="Verified artist">
+                  <span className="relative -top-0.5 sm:-top-1 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
                     <VerifiedBadge size="lg" />
                   </span>
                 ) : null}

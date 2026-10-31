@@ -297,9 +297,16 @@ function ProfilePage() {
 
       {/* Header section */}
       <div>
-        <p className="text-eyebrow">{currentArtist ? "Artist profile" : "Your account"}</p>
-        <h1 className="mt-1 truncate text-2xl font-semibold sm:text-3xl">
-          {currentArtist ? currentArtist.displayName : currentUser.name}
+        <p className="text-eyebrow">
+          {currentArtist ? (currentArtist.verified ? "Verified Plugg Artist" : "Artist profile") : "Your account"}
+        </p>
+        <h1 className="mt-1 inline-flex items-start gap-1.5 truncate text-2xl font-semibold sm:text-3xl">
+          <span className="truncate">{currentArtist ? currentArtist.displayName : currentUser.name}</span>
+          {currentArtist?.verified ? (
+            <span className="relative -top-0.5 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
+              <VerifiedBadge size="md" />
+            </span>
+          ) : null}
         </h1>
       </div>
 
@@ -554,42 +561,19 @@ function ProfilePage() {
 
                 {/* Content fading in on the lower part: Name, username, location, genres, buttons */}
                 <div className="relative z-10 p-6 sm:p-8 space-y-3.5">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground drop-shadow-sm">
-                        {currentArtist.displayName}
-                      </h2>
-                      {currentArtist.verified ? (
-                        <span
-                          className="inline-flex shrink-0 self-center"
-                          title="Verified artist"
-                        >
-                          <VerifiedBadge size="md" />
-                        </span>
-                      ) : null}
-                    </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground drop-shadow-sm">
+                      {currentArtist.displayName}
+                    </h2>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        @{currentArtist.username.replace(/^@/, "")}
-                      </p>
-                      {currentArtist.city || currentArtist.country || currentArtist.location ? (
-                        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground/90">
-                          <span>•</span>
-                          <MapPin className="h-3 w-3 text-primary" />
-                          <span>
-                            {currentArtist.city && currentArtist.country
-                              ? `${currentArtist.city}, ${currentArtist.country}`
-                              : currentArtist.city || currentArtist.country || currentArtist.location}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      @{currentArtist.username.replace(/^@/, "")}
+                    </p>
 
-                    {/* Genres Badges */}
+                    {/* Genres right below username */}
                     {currentArtist.primaryGenre ||
                     (currentArtist.additionalGenres && currentArtist.additionalGenres.length > 0) ? (
-                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-1">
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
                         {currentArtist.primaryGenre ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
                             <Music2 className="h-3 w-3" />
