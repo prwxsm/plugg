@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   AudioLines,
   BadgeCheck,
@@ -33,6 +34,7 @@ import {
   type AdminResult,
   type AdminSnapshot,
   type AdminTrack,
+  type AdminComplaint,
 } from "./model";
 import {
   Artwork,
@@ -61,6 +63,7 @@ const nav = [
   ["Review Queue", "/admin/review-queue", ShieldAlert],
   ["Scheduled Releases", "/admin/scheduled", CalendarClock],
   ["Music Catalog", "/admin/catalog", Disc3],
+  ["Copyright & Complaints", "/admin/complaints", AlertTriangle],
   ["Artist Directory", "/admin/artists", Users],
   ["Genre Taxonomy", "/admin/genres", Tags],
   ["Users", "/admin/users", Users],
@@ -76,6 +79,8 @@ const subtitles: Record<string, string> = {
   "Scheduled Releases":
     "Stored publication dates and scheduler readiness. No automatic publication.",
   "Music Catalog": "Existing tracks and releases, with recorded visibility and audio metadata.",
+  "Copyright & Complaints":
+    "Internal copyright dispute records received via support@plugg.site and active publication rights holds.",
   "Artist Directory": "Existing artist accounts, identity details and recorded verification.",
   "Genre Taxonomy": "Current discovery taxonomy and matching catalog counts.",
   Users: "Existing Plugg accounts and their database permissions.",
@@ -166,7 +171,7 @@ export function AdminApp() {
   const pageAllowed =
     data.currentUser.role === "super_admin" ||
     (data.currentUser.role === "moderator"
-      ? ["Overview", "Review Queue"].includes(page)
+      ? ["Overview", "Review Queue", "Copyright & Complaints"].includes(page)
       : !["Users", "Staff & Access"].includes(page));
   if (!pageAllowed)
     return (
@@ -241,7 +246,7 @@ export function AdminApp() {
               ([name]) =>
                 data.currentUser.role === "super_admin" ||
                 (data.currentUser.role === "moderator"
-                  ? ["Overview", "Review Queue"].includes(name)
+                  ? ["Overview", "Review Queue", "Copyright & Complaints"].includes(name)
                   : !["Users", "Staff & Access"].includes(name)),
             )
             .map(([name, to, Icon]) => (
@@ -444,6 +449,17 @@ export function AdminApp() {
                         <div className="ad-tags">
                           <h2>{r.title}</h2>
                           <Pill>{r.type}</Pill>
+                          {r.rightsHold && (
+                            <Pill tone="red">
+                              RIGHTS HOLD: {r.rightsHoldReason || "Publication blocked"}
+                            </Pill>
+                          )}
+                          <Pill tone={r.rightsDeclarationAccepted ? "green" : "amber"}>
+                            Rights:{" "}
+                            {r.rightsDeclarationAccepted
+                              ? `Confirmed (${r.uploaderRole || "owner"})`
+                              : "Unconfirmed"}
+                          </Pill>
                         </div>
                         <p>
                           <Link to="/admin/artists" hash={r.artistId}>
@@ -482,8 +498,24 @@ export function AdminApp() {
                                 Producer: {t.producers || "Not recorded"} ·{" "}
                                 {Math.floor(t.durationSeconds / 60)}:
                                 {String(t.durationSeconds % 60).padStart(2, "0")} ·{" "}
-                                {t.pluggTrackId || "Track ID not recorded"}
+                                Plugg ID: {t.pluggTrackId || "Not assigned"}
+                                {t.isrc ? ` · Official ISRC: ${t.isrc}` : ""}
                               </small>
+                              <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                <Pill tone={t.recordingType === "remix" || t.recordingType === "cover" ? "amber" : ""}>
+                                  Type: {(t.recordingType || "original").toUpperCase()}
+                                </Pill>
+                                {t.hasSamplesOrBeats && (
+                                  <Pill tone="amber">
+                                    3rd-Party Content: {t.sampleDetails || "Samples/licensed beats"}
+                                  </Pill>
+                                )}
+                                {t.duplicateMatchesCount && t.duplicateMatchesCount > 0 ? (
+                                  <Pill tone="red">
+                                    DUPLICATE AUDIO: Exact checksum match in other artist catalog ({t.duplicateMatchesCount})
+                                  </Pill>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
                           <Specs track={t} />
@@ -649,6 +681,216 @@ export function AdminApp() {
               </div>
               {!tracks.length && <Empty />}
             </section>
+          )}
+          {page === "Copyright & Complaints" && (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <section className="ad-panel" style={{ padding: "16px 20px" }}>
+                  <small style={{ color: "var(--ad-muted, #6b7280)", display: "block" }}>
+                    Active Rights Holds
+                  </small>
+                  <strong style={{ fontSize: 24, color: "var(--ad-red, #dc2626)" }}>
+                    {data.releases.filter((r) => r.rightsHold).length}
+                  </strong>
+                  <div style={{ fontSize: 12, color: "var(--ad-muted, #6b7280)", marginTop: 4 }}>
+                    Releases blocked from publishing
+                  </div>
+                </section>
+                <section className="ad-panel" style={{ padding: "16px 20px" }}>
+                  <small style={{ color: "var(--ad-muted, #6b7280)", display: "block" }}>
+                    Open Disputes / Complaints
+                  </small>
+                  <strong style={{ fontSize: 24, color: "var(--ad-amber, #d97706)" }}>
+                    {
+                      (data.complaints || []).filter((c) =>
+                        ["received", "under_investigation"].includes(c.status),
+                      ).length
+                    }
+                  </strong>
+                  <div style={{ fontSize: 12, color: "var(--ad-muted, #6b7280)", marginTop: 4 }}>
+                    support@plugg.site reports pending
+                  </div>
+                </section>
+                <section className="ad-panel" style={{ padding: "16px 20px" }}>
+                  <small style={{ color: "var(--ad-muted, #6b7280)", display: "block" }}>
+                    Resolved / Dismissed Cases
+                  </small>
+                  <strong style={{ fontSize: 24, color: "var(--ad-green, #16a34a)" }}>
+                    {
+                      (data.complaints || []).filter((c) =>
+                        ["resolved", "dismissed"].includes(c.status),
+                      ).length
+                    }
+                  </strong>
+                  <div style={{ fontSize: 12, color: "var(--ad-muted, #6b7280)", marginTop: 4 }}>
+                    Audited resolutions & reinstatements
+                  </div>
+                </section>
+              </div>
+
+              <section className="ad-panel" style={{ marginBottom: 20 }}>
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    borderBottom: "1px solid var(--ad-border, #e5e7eb)",
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Active Rights Holds</h3>
+                  <small style={{ color: "var(--ad-muted, #6b7280)" }}>
+                    Releases held from Africa/Kampala midnight publication and streaming until rights review is complete.
+                  </small>
+                </div>
+                <div className="ad-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        {["Release", "Artist", "Status", "Hold Reason", "Hold Placed", "Actions"].map((x) => (
+                          <th key={x}>{x}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.releases
+                        .filter((r) => r.rightsHold)
+                        .map((r) => (
+                          <tr key={r.id}>
+                            <td>
+                              <div className="ad-identity">
+                                <Artwork src={r.coverUrl} title="" />
+                                <div>
+                                  <strong>{r.title}</strong>
+                                  <small>{r.type} · {r.releaseDate}</small>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{r.artistName}</td>
+                            <td>
+                              <Pill tone="amber">{statusLabels[r.status] || r.status}</Pill>
+                            </td>
+                            <td>
+                              <strong style={{ color: "var(--ad-red, #dc2626)" }}>
+                                {r.rightsHoldReason || "Rights review pending"}
+                              </strong>
+                            </td>
+                            <td>{r.rightsHoldPlacedAt ? kampala(r.rightsHoldPlacedAt) : "Recorded"}</td>
+                            <td>
+                              <Pill tone="red">Held</Pill>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!data.releases.some((r) => r.rightsHold) && (
+                  <Empty title="No active rights holds">
+                    There are no catalog or scheduled releases currently blocked by publication holds.
+                  </Empty>
+                )}
+              </section>
+
+              <section className="ad-panel">
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    borderBottom: "1px solid var(--ad-border, #e5e7eb)",
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+                    Copyright Complaints (support@plugg.site)
+                  </h3>
+                  <small style={{ color: "var(--ad-muted, #6b7280)" }}>
+                    Privately recorded reports, complainant contacts (staff only), and resolution history.
+                  </small>
+                </div>
+                <div className="ad-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        {[
+                          "Reference",
+                          "Case Status",
+                          "Target Release / Track",
+                          "Complainant (Confidential)",
+                          "Conflict Nature",
+                          "Evidence / Admin Notes",
+                          "Received At",
+                          "Outcome",
+                        ].map((x) => (
+                          <th key={x}>{x}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.complaints || []).map((c) => (
+                        <tr key={c.id}>
+                          <td>
+                            <strong>{c.complaintReference}</strong>
+                          </td>
+                          <td>
+                            <Pill
+                              tone={
+                                c.status === "resolved"
+                                  ? "green"
+                                  : c.status === "dismissed"
+                                    ? ""
+                                    : "amber"
+                              }
+                            >
+                              {c.status.toUpperCase()}
+                            </Pill>
+                          </td>
+                          <td>
+                            <div>
+                              <strong>{c.releaseTitle || "General catalog"}</strong>
+                              {c.trackTitle && <small> · Track: {c.trackTitle}</small>}
+                              {c.artistName && <small> · Artist: {c.artistName}</small>}
+                            </div>
+                          </td>
+                          <td>
+                            <div>
+                              <span>{c.complainantName}</span>
+                              <br />
+                              <small style={{ color: "var(--ad-muted, #6b7280)" }}>
+                                {c.complainantEmail}
+                              </small>
+                            </div>
+                          </td>
+                          <td>
+                            <p style={{ margin: 0, maxWidth: 280, fontSize: 13 }}>
+                              {c.conflictNature}
+                            </p>
+                          </td>
+                          <td>
+                            <small>{c.evidenceNotes || c.adminNotes || "None recorded"}</small>
+                          </td>
+                          <td>{kampala(c.createdAt)}</td>
+                          <td>
+                            <small>
+                              {c.resolutionNotes ||
+                                (c.resolvedAt
+                                  ? `Closed ${kampala(c.resolvedAt)}`
+                                  : "Under evaluation")}
+                            </small>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!(data.complaints || []).length && (
+                  <Empty title="No complaints logged">
+                    No copyright dispute records have been logged from support@plugg.site.
+                  </Empty>
+                )}
+              </section>
+            </>
           )}
           {page === "Artist Directory" && (
             <>
@@ -882,6 +1124,59 @@ export function AdminApp() {
           </DialogDescription>
           {detail && (
             <div className="ad-form">
+              <div
+                style={{
+                  background: "var(--ad-bg-subtle, #f9fafb)",
+                  border: "1px solid var(--ad-border, #e5e7eb)",
+                  borderRadius: 8,
+                  padding: 12,
+                }}
+              >
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                  <Pill
+                    tone={
+                      detail.recordingType === "remix" || detail.recordingType === "cover"
+                        ? "amber"
+                        : ""
+                    }
+                  >
+                    Recording: {(detail.recordingType || "original").toUpperCase()}
+                  </Pill>
+                  {detail.isrc && <Pill>Official ISRC: {detail.isrc}</Pill>}
+                  <Pill>Plugg Track ID: {detail.pluggTrackId || "Unassigned"}</Pill>
+                </div>
+                {detail.hasSamplesOrBeats && (
+                  <p style={{ margin: "4px 0", fontSize: 13 }}>
+                    <strong>3rd-Party Beats / Samples:</strong>{" "}
+                    {detail.sampleDetails || "Declared by uploader"}
+                  </p>
+                )}
+                {detail.fileHash && (
+                  <p
+                    style={{
+                      margin: "4px 0",
+                      fontSize: 12,
+                      fontFamily: "monospace",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    <strong>SHA-256 Checksum:</strong> {detail.fileHash}
+                  </p>
+                )}
+                {detail.duplicateMatchesCount && detail.duplicateMatchesCount > 0 ? (
+                  <p
+                    style={{
+                      margin: "4px 0",
+                      fontSize: 13,
+                      color: "var(--ad-red, #dc2626)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Exact duplicate audio detected in {detail.duplicateMatchesCount} other account
+                    release(s).
+                  </p>
+                ) : null}
+              </div>
               <Specs track={detail} />
               <AudioPreview track={detail} />
               <Variants track={detail} />

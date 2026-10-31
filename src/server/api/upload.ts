@@ -82,16 +82,74 @@ export async function handleUploadRequest(request: Request): Promise<Response> {
     const fileId = crypto.randomUUID();
     const resolvedOwnerId = ownerId || "system";
 
+    const { computeBufferSha256 } = await import("@/lib/rights-validation");
+    const fileHash = computeBufferSha256(buffer);
+
+    let duplicateInfo: {
+      status: "none" | "same_artist" | "different_artist";
+      existingTrackTitle?: string;
+      existingReleaseTitle?: string;
+      existingPluggTrackId?: string;
+      existingTrackId?: string;
+    } = { status: "none" };
+
+    if (category === "audio") {
+      try {
+        let currentArtistId: string | null = null;
+        if (ownerId) {
+          const [userRow] = await sql<{ artist_id: string | null }[]>`
+            SELECT artist_id FROM users WHERE id = ${ownerId} LIMIT 1
+          `;
+          currentArtistId = userRow?.artist_id || null;
+        }
+
+        const matches = await sql<{
+          id: string;
+          title: string;
+          artist_id: string;
+          plugg_track_id: string;
+          release_id: string;
+          release_title: string;
+        }[]>`
+          SELECT t.id, t.title, t.artist_id, t.plugg_track_id, t.release_id, r.title AS release_title
+          FROM tracks t
+          JOIN releases r ON r.id = t.release_id
+          WHERE t.file_hash = ${fileHash}
+          ORDER BY t.created_at DESC
+          LIMIT 1
+        `;
+
+        if (matches.length > 0) {
+          const match = matches[0]!;
+          if (currentArtistId && match.artist_id === currentArtistId) {
+            duplicateInfo = {
+              status: "same_artist",
+              existingTrackTitle: match.title,
+              existingReleaseTitle: match.release_title,
+              existingPluggTrackId: match.plugg_track_id,
+              existingTrackId: match.id,
+            };
+          } else {
+            duplicateInfo = {
+              status: "different_artist",
+            };
+          }
+        }
+      } catch (dupErr) {
+        console.warn("Duplicate hash check error:", dupErr);
+      }
+    }
+
     // Insert into files table if ownerId is a valid user, or without FK constraint issue
     try {
       if (ownerId) {
         await sql`
           INSERT INTO files (
-            id, owner_id, track_id, original_filename, storage_key, mime_type, size, category, storage_provider, upload_status
+            id, owner_id, track_id, original_filename, storage_key, mime_type, size, category, storage_provider, upload_status, file_hash
           )
           VALUES (
             ${fileId}, ${ownerId}, ${trackId}, ${file.name}, ${storageKey}, ${file.type || "application/octet-stream"},
-            ${file.size}, ${category}, 'local', 'ready'
+            ${file.size}, ${category}, 'local', 'ready', ${fileHash}
           )
         `;
       }
@@ -110,6 +168,8 @@ export async function handleUploadRequest(request: Request): Promise<Response> {
         filename: file.name,
         size: file.size,
         mimeType: file.type,
+        fileHash,
+        duplicateInfo,
         technicalValidation,
       }),
       {

@@ -30,10 +30,13 @@ export async function reviewRelease(
     await tx`SELECT pg_advisory_xact_lock(734821,1)`;
     const actor = await requirePermission(tx, sessionId, "review.write");
     const [release] =
-      await tx`SELECT id,title,status,release_date::text,review_history,audio_processing_status FROM releases WHERE id=${data.releaseId} FOR UPDATE`;
+      await tx`SELECT id,title,status,release_date::text,review_history,audio_processing_status,coalesce(rights_hold, false) AS rights_hold FROM releases WHERE id=${data.releaseId} FOR UPDATE`;
     if (!release) throw new Error("Release not found.");
     if (release["status"] !== "under_review")
       throw new Error("This release is no longer awaiting review. Refresh and try again.");
+    if (data.action === "approve" && release["rightsHold"]) {
+      throw new Error("Cannot approve release: An active rights hold exists. Resolve the rights conflict before scheduling.");
+    }
     const [clock] = await tx<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
     const now = clock!.now;
     const raw = decodeJson(release["reviewHistory"]);

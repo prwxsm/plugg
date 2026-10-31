@@ -88,6 +88,28 @@ export interface ReviewHistoryItem {
 }
 
 
+export type RecordingType = "original" | "cover" | "remix" | "other";
+export type UploaderRole = "owner" | "authorized_representative";
+
+export interface CopyrightComplaint {
+  id: string;
+  reference: string;
+  releaseId?: string | null | undefined;
+  trackId?: string | null | undefined;
+  complainantName: string;
+  complainantEmail: string;
+  rightsHolderRepresented?: string | null | undefined;
+  workClaimed: string;
+  natureOfInfringement: string;
+  evidenceNotes?: string | null | undefined;
+  status: "received" | "under_investigation" | "resolved_takedown" | "resolved_reinstated" | "dismissed";
+  adminNotes?: string | null | undefined;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string | null | undefined;
+  resolvedBy?: string | null | undefined;
+}
+
 export interface Release {
   id: string;
   artistId: string;
@@ -109,6 +131,16 @@ export interface Release {
   audioProcessingStatus?: "pending" | "processing" | "completed" | "failed" | undefined;
   technicalValidation?: TechnicalValidation | undefined;
   reviewHistory?: ReviewHistoryItem[] | undefined;
+  uploaderRole?: UploaderRole | undefined;
+  rightsDeclarationAccepted?: boolean | undefined;
+  rightsDeclarationText?: string | undefined;
+  rightsDeclarationVersion?: string | undefined;
+  rightsDeclarationTimestamp?: string | undefined;
+  rightsDeclaredByUserId?: string | undefined;
+  rightsHold?: boolean | undefined;
+  rightsHoldReason?: string | undefined;
+  rightsHoldPlacedAt?: string | undefined;
+  rightsHoldPlacedBy?: string | undefined;
   createdAt?: string | undefined;
 }
 
@@ -133,6 +165,11 @@ export interface Track {
   features?: string | undefined;
   producers?: string | undefined;
   lyrics?: string | undefined;
+  recordingType?: RecordingType | undefined;
+  hasSamplesOrBeats?: boolean | undefined;
+  sampleDetails?: string | undefined;
+  isrc?: string | undefined;
+  fileHash?: string | undefined;
   audioProcessingStatus?: "pending" | "processing" | "completed" | "failed" | undefined;
   technicalValidation?: TechnicalValidation | undefined;
   audioVariants?: Record<string, AudioVariantInfo> | undefined;

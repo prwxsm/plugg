@@ -23,6 +23,7 @@ import {
   Pause,
   RotateCcw,
   Loader2,
+  UploadCloud,
 } from "lucide-react";
 import {
   Area,
@@ -45,8 +46,9 @@ import {
   inputClass,
 } from "@/components/plugg/primitives";
 import { art } from "@/data/covers";
-import type { Release } from "@/data/types";
+import type { Release, Track } from "@/data/types";
 import { formatCount, formatDate, formatDateTime, formatDuration, goLiveAt, todayISO } from "@/lib/plugg";
+import { getAudioDuration, validateAudioFileInBrowser } from "@/lib/audio-validation";
 import { PluggDatePicker } from "@/components/plugg/date-picker";
 import { usePlugg } from "@/state/plugg-store";
 import { cn } from "@/lib/utils";
@@ -978,6 +980,25 @@ function YourReleasesTab() {
               />
             </div>
 
+            {/* Audio Replacement section for tracks */}
+            <div className="space-y-2 border-t border-border/60 pt-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-foreground">
+                  Release Tracks &amp; Audio Replacement
+                </label>
+                <span className="text-[10px] text-muted-foreground">
+                  Replace audio if reviewer requested corrections
+                </span>
+              </div>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {tracks
+                  .filter((t) => t.releaseId === resubmitTarget.id)
+                  .map((t) => (
+                    <TrackAudioReplacer key={t.id} track={t} />
+                  ))}
+              </div>
+            </div>
+
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <Button
                 variant="outline"
@@ -1043,6 +1064,119 @@ function YourReleasesTab() {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function TrackAudioReplacer({
+  track,
+  onAudioReplaced,
+}: {
+  track: Track;
+  onAudioReplaced?: () => void;
+}) {
+  const { replaceTrackAudio, currentUser } = usePlugg();
+  const [isReplacing, setIsReplacing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsReplacing(true);
+    setStatusMessage("Validating audio specs…");
+    try {
+      const realSec = await getAudioDuration(file);
+      const val = await validateAudioFileInBrowser(file, realSec);
+      if (!val.valid) {
+        toast.error(`Audio validation failed: ${val.error || "Requirements not met"}`);
+        setIsReplacing(false);
+        setStatusMessage(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      setStatusMessage("Uploading replacement audio…");
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("category", "audio");
+      if (currentUser?.id) fd.append("ownerId", currentUser.id);
+
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Failed to upload replacement audio");
+      }
+
+      setStatusMessage("Generating variants & verifying…");
+      await replaceTrackAudio(track.id, uploadData.url, realSec > 0 ? realSec : undefined);
+      toast.success(`Corrected audio master updated for "${track.title}"!`);
+      onAudioReplaced?.();
+    } catch (err: any) {
+      toast.error(err.message || "Audio replacement failed. Working audio was preserved.");
+    } finally {
+      setIsReplacing(false);
+      setStatusMessage(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-border/80 bg-elevated/30 p-3 text-xs">
+      <div className="min-w-0 space-y-0.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-foreground truncate">{track.title}</span>
+          {track.pluggTrackId && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
+              <Hash size={9} className="text-primary" />
+              {track.pluggTrackId}
+            </span>
+          )}
+          {track.isrc && (
+            <span className="text-[10px] text-muted-foreground font-mono">
+              ISRC: {track.isrc}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {formatDuration(track.durationSeconds)} · {track.genre || "Afrobeats"}
+        </p>
+        {statusMessage && (
+          <p className="text-[11px] text-primary flex items-center gap-1.5 pt-1 animate-pulse">
+            <Loader2 size={11} className="animate-spin" />
+            <span>{statusMessage}</span>
+          </p>
+        )}
+      </div>
+
+      <div className="shrink-0">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".wav,.flac,.mp3,audio/wav,audio/flac,audio/mpeg,audio/mp3,audio/x-wav,audio/x-flac"
+          className="sr-only"
+          disabled={isReplacing}
+          onChange={handleFileChange}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isReplacing}
+          onClick={() => fileInputRef.current?.click()}
+          className="text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
+        >
+          {isReplacing ? (
+            <>
+              <Loader2 size={12} className="animate-spin" /> Replacing…
+            </>
+          ) : (
+            <>
+              <UploadCloud size={12} /> Replace Audio Master
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

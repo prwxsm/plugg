@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   UploadCloud,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -27,10 +28,11 @@ import {
 import { ArtistMobileTabs } from "@/components/plugg/artist-mobile-tabs";
 import { PluggDatePicker } from "@/components/plugg/date-picker";
 import { art } from "@/data/covers";
-import type { Release, TechnicalValidation } from "@/data/types";
+import type { RecordingType, Release, TechnicalValidation, UploaderRole } from "@/data/types";
 import { emptySongDraft, usePlugg, type SongDraft } from "@/state/plugg-store";
 import { formatDateTime, formatDuration, goLiveAt, todayISO } from "@/lib/plugg";
 import { validateAudioFileInBrowser } from "@/lib/audio-validation";
+import { PLUGG_RIGHTS_DECLARATION_TEXT } from "@/lib/rights-validation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -494,6 +496,171 @@ function AudioRequirementsNotice({ errorList }: { errorList?: string[] | undefin
   );
 }
 
+function TrackRightsFields({
+  song,
+  onChange,
+  trackNumber,
+}: {
+  song: SongDraft;
+  onChange: (patch: Partial<SongDraft>) => void;
+  trackNumber?: number;
+}) {
+  const recType = song.recordingType || "original";
+  const hasSamples = Boolean(song.hasSamplesOrBeats);
+  const sampleDetails = song.sampleDetails || "";
+  const isrc = song.isrc || "";
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/70 bg-elevated/20 p-3.5 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-foreground tracking-tight flex items-center gap-1.5">
+          <ShieldCheck size={14} className="text-primary" />
+          <span>Rights &amp; Recording Details{trackNumber ? ` (Track ${trackNumber})` : ""}</span>
+        </span>
+        <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider">Required for review</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        <div>
+          <label className="block text-[11px] font-medium text-foreground mb-1">
+            Recording classification <span className="text-destructive">*</span>
+          </label>
+          <select
+            value={recType}
+            onChange={(e) => onChange({ recordingType: e.target.value as RecordingType })}
+            className={inputClass}
+          >
+            <option value="original">Original recording</option>
+            <option value="cover">Cover version</option>
+            <option value="remix">Remix</option>
+            <option value="other">Other / Adaptation</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+            Official ISRC (optional)
+          </label>
+          <input
+            value={isrc}
+            onChange={(e) => onChange({ isrc: e.target.value })}
+            className={inputClass}
+            placeholder="e.g. US-S1Z-26-00001"
+            maxLength={15}
+          />
+          <p className="mt-1 text-[10px] text-muted-foreground leading-normal">
+            Already have an official ISRC for this recording? Enter it here. Otherwise, leave this field empty. Plugg will automatically assign its own internal tracking ID.
+          </p>
+        </div>
+      </div>
+
+      {recType !== "original" && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-300 space-y-1">
+          <p className="font-semibold">Licensing Guidance for {recType === "cover" ? "Cover Versions" : recType === "remix" ? "Remixes" : "Non-Original Recordings"}:</p>
+          <p className="text-amber-200/90 leading-relaxed">
+            Covers, remixes, and adaptations require authorization or mechanical licensing from the underlying composition copyright owners. Our moderation team may request proof of rights before publication.
+          </p>
+        </div>
+      )}
+
+      <div className="pt-2 border-t border-border/40 space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none text-foreground font-medium text-[11px]">
+          <input
+            type="checkbox"
+            checked={hasSamples}
+            onChange={(e) => onChange({ hasSamplesOrBeats: e.target.checked })}
+            className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+          />
+          <span>This track contains third-party samples or licensed beats</span>
+        </label>
+
+        {hasSamples && (
+          <div className="pl-5 space-y-1 animate-in fade-in">
+            <label className="block text-[10px] text-muted-foreground">
+              Sample or beat license details <span className="text-destructive">*</span>
+            </label>
+            <input
+              value={sampleDetails}
+              onChange={(e) => onChange({ sampleDetails: e.target.value })}
+              className={inputClass}
+              placeholder="e.g. Producer name, BeatStars non-exclusive license #1234, cleared sample from Tracklib"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UploaderRoleField({
+  value,
+  onChange,
+}: {
+  value: UploaderRole;
+  onChange: (role: UploaderRole) => void;
+}) {
+  return (
+    <Field
+      label="Ownership & Authorization Role"
+      hint="Confirm your legal relationship to the recordings in this release."
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={() => onChange("owner")}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl p-3 text-xs font-medium transition-all text-left",
+            value === "owner"
+              ? "bg-primary/15 text-primary font-semibold border border-primary/30"
+              : "bg-elevated/40 text-muted-foreground hover:bg-elevated hover:text-foreground",
+          )}
+        >
+          <span
+            className={cn(
+              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+              value === "owner"
+                ? "bg-primary text-primary-foreground"
+                : "bg-elevated text-muted-foreground",
+            )}
+          >
+            {value === "owner" ? <Check size={11} strokeWidth={3} /> : null}
+          </span>
+          <div>
+            <span className="block font-medium">Rights Owner</span>
+            <span className="block text-[10px] text-muted-foreground">Original creator or copyright holder</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onChange("authorized_representative")}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl p-3 text-xs font-medium transition-all text-left",
+            value === "authorized_representative"
+              ? "bg-primary/15 text-primary font-semibold border border-primary/30"
+              : "bg-elevated/40 text-muted-foreground hover:bg-elevated hover:text-foreground",
+          )}
+        >
+          <span
+            className={cn(
+              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+              value === "authorized_representative"
+                ? "bg-primary text-primary-foreground"
+                : "bg-elevated text-muted-foreground",
+            )}
+          >
+            {value === "authorized_representative" ? <Check size={11} strokeWidth={3} /> : null}
+          </span>
+          <div>
+            <span className="block font-medium">Authorized Representative</span>
+            <span className="block text-[10px] text-muted-foreground">Distributor, label rep, or manager</span>
+          </div>
+        </button>
+      </div>
+    </Field>
+  );
+}
+
 function UploadPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -511,6 +678,8 @@ function UploadPage() {
   const [genre, setGenre] = useState("Afrobeats");
   const [description, setDescription] = useState("");
   const [songs, setSongs] = useState<SongDraft[]>([emptySongDraft()]);
+  const [uploaderRole, setUploaderRole] = useState<UploaderRole>("owner");
+  const [rightsDeclarationAccepted, setRightsDeclarationAccepted] = useState(false);
   const [uploadPercent, setUploadPercent] = useState<number | null>(null);
   const [uploadStatusText, setUploadStatusText] = useState<string>("Uploading…");
 
@@ -635,6 +804,9 @@ function UploadPage() {
         setLabelName(uploadDraft.label);
       }
     }
+    if (uploadDraft.uploaderRole) {
+      setUploaderRole(uploadDraft.uploaderRole);
+    }
     setReleaseDate(uploadDraft.releaseDate);
     const restoredSongs = uploadDraft.songs.length ? uploadDraft.songs : [emptySongDraft()];
     setSongs(restoredSongs);
@@ -675,6 +847,7 @@ function UploadPage() {
         coverKey,
         releaseDate,
         songs,
+        uploaderRole,
         savedAt: new Date().toISOString(),
       });
     }, 400);
@@ -691,6 +864,7 @@ function UploadPage() {
     coverKey,
     releaseDate,
     songs,
+    uploaderRole,
     uploadPercent,
   ]);
 
@@ -830,11 +1004,11 @@ function UploadPage() {
     canContinue = true;
   } else if (isSingle) {
     if (step === 1) canContinue = singleDetailsReady;
-    else if (step === 2) canContinue = uploadPercent === null;
+    else if (step === 2) canContinue = uploadPercent === null && rightsDeclarationAccepted;
   } else {
     if (step === 1) canContinue = epAlbumSongsReady;
     else if (step === 2) canContinue = epAlbumDetailsReady;
-    else if (step === 3) canContinue = uploadPercent === null;
+    else if (step === 3) canContinue = uploadPercent === null && rightsDeclarationAccepted;
   }
 
   const patchSong = (index: number, patch: Partial<SongDraft>) =>
@@ -963,6 +1137,8 @@ function UploadPage() {
     setCoverFile(null);
     setCoverPreview(null);
     setCoverKey("c1");
+    setUploaderRole("owner");
+    setRightsDeclarationAccepted(false);
     rawAudioFiles.current.clear();
     navigate({ to: "/upload", search: {} });
   };
@@ -1015,6 +1191,16 @@ function UploadPage() {
             const targetSong = updatedSongs[idx];
             if (targetSong && data.url) {
               targetSong.audioUrl = data.url;
+              if (data.fileHash) targetSong.fileHash = data.fileHash;
+            }
+            if (data.duplicateInfo?.isDuplicate) {
+              if (data.duplicateInfo.matchType === "same_artist") {
+                toast.warning(
+                  `Notice: This exact recording already exists in your catalog under "${data.duplicateInfo.matchedTitle || "another release"}". You can still submit or reuse this audio across releases.`,
+                );
+              } else {
+                toast.info("Audio registered. Standard rights review will be conducted prior to publication.");
+              }
             }
           } catch (uploadErr: any) {
             console.error("File upload to server failed:", uploadErr);
@@ -1040,6 +1226,8 @@ function UploadPage() {
         label: effectiveLabel,
         releaseDate,
         songs: updatedSongs,
+        uploaderRole,
+        rightsDeclarationAccepted,
       });
 
       setUploadPercent(100);
@@ -1354,6 +1542,12 @@ function UploadPage() {
               ) : null}
             </div>
 
+            {/* Rights & Recording Classification */}
+            <TrackRightsFields
+              song={songs[0] || emptySongDraft(genre)}
+              onChange={(patch) => patchSong(0, patch)}
+            />
+
             {/* Single requirements */}
             <div className="rounded-xl bg-elevated/30 p-4">
               <p className="text-eyebrow">Minimum requirements</p>
@@ -1583,6 +1777,13 @@ function UploadPage() {
                       </div>
                     ) : null}
                   </div>
+
+                  {/* Rights & Recording Classification for this track */}
+                  <TrackRightsFields
+                    trackNumber={i + 1}
+                    song={song}
+                    onChange={(patch) => patchSong(i, patch)}
+                  />
                 </div>
               ))}
             </div>
@@ -1766,6 +1967,34 @@ function UploadPage() {
                   </div>
                 </div>
               ) : null}
+            </div>
+
+            {/* Ownership & Authorization Role */}
+            <UploaderRoleField value={uploaderRole} onChange={setUploaderRole} />
+
+            {/* Mandatory Copyright & Distribution Declaration Affirmation */}
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={16} className="text-primary" />
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                  Mandatory Copyright &amp; Distribution Declaration
+                </p>
+              </div>
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rightsDeclarationAccepted}
+                  onChange={(e) => setRightsDeclarationAccepted(e.target.checked)}
+                  className="mt-0.5 rounded border-border text-primary focus:ring-primary h-4 w-4 shrink-0"
+                />
+                <span className="text-xs text-foreground leading-relaxed font-normal">
+                  {PLUGG_RIGHTS_DECLARATION_TEXT}
+                </span>
+              </label>
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-border/40">
+                <span>Immutable record: logged with submitting user, IP &amp; timestamp</span>
+                <span className="font-mono text-[10px]">Version: 2026-10-31.1</span>
+              </div>
             </div>
 
             {uploadPercent !== null ? (

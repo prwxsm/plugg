@@ -520,3 +520,31 @@ export async function validateAudioFileInBrowser(
     };
   }
 }
+
+export const estimateDuration = (bytes: number): number => Math.max(30, Math.round(bytes / 20000));
+
+export const getAudioDuration = (file: File): Promise<number> => {
+  return new Promise((resolve) => {
+    try {
+      if (typeof window === "undefined") {
+        resolve(estimateDuration(file.size));
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const audio = new Audio();
+      audio.preload = "metadata";
+      audio.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        const sec = Math.round(audio.duration);
+        resolve(Number.isFinite(sec) && sec > 0 ? sec : estimateDuration(file.size));
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(estimateDuration(file.size));
+      };
+      audio.src = url;
+    } catch {
+      resolve(estimateDuration(file.size));
+    }
+  });
+};

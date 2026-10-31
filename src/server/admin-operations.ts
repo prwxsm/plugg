@@ -10,6 +10,10 @@ export const operationInput = z
       "reschedule",
       "takedown",
       "reinstate",
+      "place_rights_hold",
+      "release_rights_hold",
+      "record_complaint",
+      "update_complaint",
       "verify_artist",
       "edit_artist",
       "create_genre",
@@ -47,6 +51,15 @@ export const operationInput = z
       .transform((v) => v.toLowerCase())
       .optional(),
     initialPassword: z.string().min(12).max(72).optional(),
+    complaintStatus: z.enum(["received", "under_investigation", "resolved", "dismissed"]).optional(),
+    complainantName: z.string().trim().max(200).optional(),
+    complainantEmail: z.string().trim().email().max(254).optional(),
+    conflictNature: z.string().trim().max(2000).optional(),
+    workClaimed: z.string().trim().max(500).optional(),
+    evidenceNotes: z.string().trim().max(3000).optional(),
+    resolutionNotes: z.string().trim().max(3000).optional(),
+    adminNotes: z.string().trim().max(3000).optional(),
+    trackId: z.string().max(100).optional(),
     confirmed: z.literal(true),
   })
   .strict();
@@ -54,6 +67,10 @@ const permissions: Record<z.infer<typeof operationInput>["action"], AdminPermiss
   reschedule: "schedule.write",
   takedown: "content.takedown",
   reinstate: "content.takedown",
+  place_rights_hold: "review.write",
+  release_rights_hold: "content.takedown",
+  record_complaint: "review.write",
+  update_complaint: "content.takedown",
   verify_artist: "artists.write",
   edit_artist: "artists.write",
   create_genre: "genres.write",
@@ -161,6 +178,81 @@ export async function administer(
         await tx`UPDATE releases SET release_date=${data.date!},go_live_at=${at},updated_at=now() WHERE id=${targetId}`;
         await tx`UPDATE tracks SET release_date=${data.date!},published=false,updated_at=now() WHERE release_id=${targetId}`;
         after = { status: "scheduled", date: data.date, goLiveAt: at.toISOString() };
+      }
+    } else if (["place_rights_hold", "release_rights_hold"].includes(data.action)) {
+      targetType = "release";
+      const [r] =
+        await tx`SELECT id,status,rights_hold,rights_hold_reason,title FROM releases WHERE id=${targetId} FOR UPDATE`;
+      if (!r) throw new Error("Release not found.");
+      before = {
+        rightsHold: r["rightsHold"],
+        rightsHoldReason: r["rightsHoldReason"],
+        status: r["status"],
+      };
+      if (data.action === "place_rights_hold") {
+        if (r["rightsHold"]) throw new Error("This release is already on rights hold.");
+        await tx`UPDATE releases SET rights_hold=true, rights_hold_reason=${data.reason}, rights_hold_placed_at=now(), rights_hold_placed_by=${actor.id}, updated_at=now() WHERE id=${targetId}`;
+        after = { rightsHold: true, rightsHoldReason: data.reason };
+      } else {
+        if (!r["rightsHold"]) throw new Error("This release is not on rights hold.");
+        await tx`UPDATE releases SET rights_hold=false, rights_hold_reason=null, rights_hold_placed_at=null, rights_hold_placed_by=null, updated_at=now() WHERE id=${targetId}`;
+        after = { rightsHold: false, rightsHoldReason: null };
+      }
+    } else if (["record_complaint", "update_complaint"].includes(data.action)) {
+      targetType = "complaint";
+      if (data.action === "record_complaint") {
+        if (!data.complainantName || !data.complainantEmail || !data.conflictNature) {
+          throw new Error("Complainant name, email and conflict nature are required.");
+        }
+        if (targetId && targetId !== "general") {
+          const [rel] = await tx`SELECT id FROM releases WHERE id=${targetId}`;
+          if (!rel) throw new Error("Referenced release not found.");
+        }
+        const refRows = await tx<{ ref: string }[]>`
+          SELECT 'CP-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('copyright_complaint_seq')::text, 4, '0') AS ref
+        `;
+        const complaintRef = refRows[0]?.ref || `CP-${Date.now()}`;
+        const complaintId = crypto.randomUUID();
+        await tx`
+          INSERT INTO copyright_complaints (
+            id, reference, release_id, track_id, complainant_name, complainant_email,
+            work_claimed, nature_of_infringement, conflict_nature, evidence_notes, status, admin_notes
+          ) VALUES (
+            ${complaintId},
+            ${complaintRef},
+            ${targetId === "general" ? null : targetId},
+            ${data.trackId || null},
+            ${data.complainantName},
+            ${data.complainantEmail},
+            ${data.workClaimed || (targetId !== "general" ? "Plugg Release/Track" : "Protected Work")},
+            ${data.conflictNature},
+            ${data.conflictNature},
+            ${data.evidenceNotes || null},
+            ${data.complaintStatus || "received"},
+            ${data.adminNotes || data.reason}
+          )
+        `;
+        targetId = complaintId;
+        after = { complaintReference: complaintRef, status: data.complaintStatus || "received" };
+      } else {
+        const [complaint] =
+          await tx`SELECT id, status, resolution_notes FROM copyright_complaints WHERE id=${targetId} FOR UPDATE`;
+        if (!complaint) throw new Error("Copyright complaint not found.");
+        before = { status: complaint["status"], resolutionNotes: complaint["resolutionNotes"] };
+        const newStatus = data.complaintStatus || "resolved";
+        const isResolved = ["resolved", "dismissed"].includes(newStatus);
+        await tx`
+          UPDATE copyright_complaints
+          SET
+            status = ${newStatus},
+            resolution_notes = ${data.resolutionNotes || data.reason},
+            admin_notes = COALESCE(${data.adminNotes || null}, admin_notes),
+            resolved_at = ${isResolved ? sql`now()` : null},
+            resolved_by = ${isResolved ? actor.id : null},
+            updated_at = now()
+          WHERE id = ${targetId}
+        `;
+        after = { status: newStatus, resolutionNotes: data.resolutionNotes || data.reason };
       }
     } else if (data.action === "staff_role") {
       targetType = "user";

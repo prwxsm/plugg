@@ -30,6 +30,12 @@ export interface AdminTrack {
   features: string | null;
   producers: string | null;
   audioProcessingStatus: string;
+  recordingType?: string | null;
+  hasSamplesOrBeats?: boolean;
+  sampleDetails?: string | null;
+  isrc?: string | null;
+  fileHash?: string | null;
+  duplicateMatchesCount?: number;
   technicalValidation: Record<string, string | number | boolean | null>;
   audioVariants: {
     name: string;
@@ -62,8 +68,36 @@ export interface AdminRelease {
   reviewedAt: string | null;
   reviewFeedback: string | null;
   audioProcessingStatus: string;
+  uploaderRole?: string | null;
+  rightsDeclarationAccepted?: boolean;
+  rightsDeclarationVersion?: string | null;
+  rightsDeclarationTimestamp?: string | null;
+  rightsHold?: boolean;
+  rightsHoldReason?: string | null;
+  rightsHoldPlacedAt?: string | null;
+  rightsHoldPlacedBy?: string | null;
   reviewHistory: AdminHistory[];
   trackIds: string[];
+}
+export interface AdminComplaint {
+  id: string;
+  complaintReference: string;
+  releaseId: string | null;
+  trackId: string | null;
+  releaseTitle?: string | null;
+  trackTitle?: string | null;
+  artistName?: string | null;
+  complainantName: string;
+  complainantEmail: string;
+  conflictNature: string;
+  evidenceNotes?: string | null;
+  status: "received" | "under_investigation" | "resolved" | "dismissed";
+  adminNotes?: string | null;
+  resolutionNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
 }
 export interface AdminArtist {
   id: string;
@@ -133,6 +167,7 @@ export interface AdminSnapshot {
   genres: AdminGenre[];
   users: AdminUser[];
   plays: AdminPlay[];
+  complaints: AdminComplaint[];
   metrics: {
     releases: number;
     tracks: number;
@@ -159,6 +194,8 @@ export interface AdminSnapshot {
     pendingAudio: number;
     playsWithIp: number;
     excludedSeedRecords: number;
+    rightsHoldCount: number;
+    openComplaints: number;
   };
   dailyPlays: { day: string; plays: number }[];
   files: { category: string; status: string; count: number; bytes: number }[];

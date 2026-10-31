@@ -6,6 +6,7 @@ import sql from "@/lib/db";
 import { getStorageProvider } from "@/lib/storage";
 import type { AudioVariantInfo, TechnicalValidation } from "@/data/types";
 import { inspectAudioHeader } from "@/lib/audio-validation";
+import { computeFileSha256 } from "@/lib/rights-validation";
 
 const execAsync = promisify(exec);
 
@@ -506,6 +507,9 @@ export async function processMasterAudio(
       type: "download",
     };
 
+    // Compute file hash of master if not already present
+    const fileHash = await computeFileSha256(masterFilePath).catch(() => null);
+
     // Update database records
     if (persist) {
       await sql`
@@ -514,6 +518,7 @@ export async function processMasterAudio(
           audio_processing_status = 'completed',
           technical_validation = ${validation.properties ? sql.json(validation.properties as any) : sql`'{}'::jsonb`},
           audio_variants = ${sql.json(variants as any)},
+          file_hash = COALESCE(file_hash, ${fileHash}),
           duration_seconds = COALESCE(NULLIF(${validation.properties.durationSeconds || 0}, 0), duration_seconds),
           updated_at = now()
         WHERE id = ${trackId}
@@ -556,3 +561,272 @@ export async function processMasterAudio(
     };
   }
 }
+
+/**
+ * Atomically replaces an existing track's master audio and regenerates all variants.
+ * Only updates active master references and variants if validation and all transcoding succeed.
+ * If transcoding fails, existing audio and variants remain completely intact.
+ */
+export async function replaceTrackAudioMaster(
+  replacementStorageKey: string,
+  trackId: string,
+  actorId?: string,
+  actorName?: string,
+): Promise<ProcessAudioResult> {
+  const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
+  const cleanMasterKey = path.normalize(replacementStorageKey).replace(/^(\.\.(\/|\\|$))+/, "").replace(/\\/g, "/");
+  let masterFilePath: string;
+  if (path.isAbsolute(replacementStorageKey)) {
+    masterFilePath = replacementStorageKey;
+  } else if (fs.existsSync(path.resolve(process.cwd(), replacementStorageKey))) {
+    masterFilePath = path.resolve(process.cwd(), replacementStorageKey);
+  } else {
+    masterFilePath = path.join(baseDir, cleanMasterKey);
+  }
+
+  if (!fs.existsSync(masterFilePath)) {
+    return {
+      success: false,
+      error: `Replacement master audio file not found at ${masterFilePath}`,
+      variants: {},
+      technicalValidation: {},
+    };
+  }
+
+  // 1. Technical inspection of replacement file
+  const validation = await probeAndValidateAudio(masterFilePath);
+  if (!validation.valid) {
+    return {
+      success: false,
+      error: validation.error || "Replacement audio failed technical validation requirements",
+      variants: {},
+      technicalValidation: validation.properties,
+    };
+  }
+
+  const fileHash = await computeFileSha256(masterFilePath).catch(() => null);
+
+  // 2. Prepare staging variants directory to prevent corrupting active variants on failure
+  const stagingTimestamp = Date.now();
+  const stagingRelDir = `variants/${trackId}/staged_${stagingTimestamp}`;
+  const stagingAbsDir = path.join(baseDir, stagingRelDir);
+  if (!fs.existsSync(stagingAbsDir)) {
+    await fs.promises.mkdir(stagingAbsDir, { recursive: true });
+  }
+
+  const storage = getStorageProvider();
+  const stagedVariants: Record<string, AudioVariantInfo> = {};
+  const stagedFiles: string[] = [];
+
+  try {
+    const ffmpegBin = getBinaryPath("ffmpeg");
+
+    // Generate Streaming variants in staging
+    // 64k Opus
+    const s64Key = `${stagingRelDir}/stream_64k.opus`;
+    const s64Path = path.join(baseDir, s64Key);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a libopus -b:a 64k -vbr on "${s64Path}"`);
+    stagedFiles.push(s64Path);
+    if (!(await verifyVariantPlayable(s64Path))) throw new Error("Staged 64k Opus variant failed verification");
+    const s64Stat = await fs.promises.stat(s64Path);
+    stagedVariants["stream_64k"] = {
+      storageKey: s64Key,
+      url: storage.getUrl(s64Key),
+      format: "opus",
+      bitrateKbps: 64,
+      sizeBytes: s64Stat.size,
+      type: "stream",
+    };
+
+    // 96k Opus
+    const s96Key = `${stagingRelDir}/stream_96k.opus`;
+    const s96Path = path.join(baseDir, s96Key);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a libopus -b:a 96k -vbr on "${s96Path}"`);
+    stagedFiles.push(s96Path);
+    if (!(await verifyVariantPlayable(s96Path))) throw new Error("Staged 96k Opus variant failed verification");
+    const s96Stat = await fs.promises.stat(s96Path);
+    stagedVariants["stream_96k"] = {
+      storageKey: s96Key,
+      url: storage.getUrl(s96Key),
+      format: "opus",
+      bitrateKbps: 96,
+      sizeBytes: s96Stat.size,
+      type: "stream",
+    };
+
+    // 160k Opus
+    const s160Key = `${stagingRelDir}/stream_160k.opus`;
+    const s160Path = path.join(baseDir, s160Key);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a libopus -b:a 160k -vbr on "${s160Path}"`);
+    stagedFiles.push(s160Path);
+    if (!(await verifyVariantPlayable(s160Path))) throw new Error("Staged 160k Opus variant failed verification");
+    const s160Stat = await fs.promises.stat(s160Path);
+    stagedVariants["stream_160k"] = {
+      storageKey: s160Key,
+      url: storage.getUrl(s160Key),
+      format: "opus",
+      bitrateKbps: 160,
+      sizeBytes: s160Stat.size,
+      type: "stream",
+    };
+
+    // 256k AAC
+    const aac256Key = `${stagingRelDir}/aac_256k.m4a`;
+    const aac256Path = path.join(baseDir, aac256Key);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a aac -b:a 256k "${aac256Path}"`);
+    stagedFiles.push(aac256Path);
+    if (!(await verifyVariantPlayable(aac256Path))) throw new Error("Staged 256k AAC variant failed verification");
+    const aac256Stat = await fs.promises.stat(aac256Path);
+    stagedVariants["stream_256k"] = {
+      storageKey: aac256Key,
+      url: storage.getUrl(aac256Key),
+      format: "aac",
+      bitrateKbps: 256,
+      sizeBytes: aac256Stat.size,
+      type: "stream",
+    };
+    stagedVariants["download_256k"] = {
+      storageKey: aac256Key,
+      url: storage.getUrl(aac256Key),
+      format: "aac",
+      bitrateKbps: 256,
+      sizeBytes: aac256Stat.size,
+      type: "download",
+    };
+
+    // 96k AAC download
+    const d96Key = `${stagingRelDir}/download_96k.m4a`;
+    const d96Path = path.join(baseDir, d96Key);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a aac -b:a 96k "${d96Path}"`);
+    stagedFiles.push(d96Path);
+    if (!(await verifyVariantPlayable(d96Path))) throw new Error("Staged 96k AAC variant failed verification");
+    const d96Stat = await fs.promises.stat(d96Path);
+    stagedVariants["download_96k"] = {
+      storageKey: d96Key,
+      url: storage.getUrl(d96Key),
+      format: "aac",
+      bitrateKbps: 96,
+      sizeBytes: d96Stat.size,
+      type: "download",
+    };
+
+    // 160k AAC download
+    const d160Key = `${stagingRelDir}/download_160k.m4a`;
+    const d160Path = path.join(baseDir, d160Key);
+    await runExec(`"${ffmpegBin}" -y -i "${masterFilePath}" -c:a aac -b:a 160k "${d160Path}"`);
+    stagedFiles.push(d160Path);
+    if (!(await verifyVariantPlayable(d160Path))) throw new Error("Staged 160k AAC variant failed verification");
+    const d160Stat = await fs.promises.stat(d160Path);
+    stagedVariants["download_160k"] = {
+      storageKey: d160Key,
+      url: storage.getUrl(d160Key),
+      format: "aac",
+      bitrateKbps: 160,
+      sizeBytes: d160Stat.size,
+      type: "download",
+    };
+
+    // Move staged files to permanent variant directory
+    const finalRelDir = `variants/${trackId}`;
+    const finalAbsDir = path.join(baseDir, finalRelDir);
+    if (!fs.existsSync(finalAbsDir)) {
+      await fs.promises.mkdir(finalAbsDir, { recursive: true });
+    }
+
+    const finalVariants: Record<string, AudioVariantInfo> = {};
+    for (const [vKey, vInfo] of Object.entries(stagedVariants)) {
+      const filename = path.basename(vInfo.storageKey);
+      const targetRelPath = `${finalRelDir}/${filename}`;
+      const targetAbsPath = path.join(baseDir, targetRelPath);
+      const srcAbsPath = path.join(baseDir, vInfo.storageKey);
+      if (fs.existsSync(srcAbsPath)) {
+        await fs.promises.rename(srcAbsPath, targetAbsPath);
+      }
+      finalVariants[vKey] = {
+        ...vInfo,
+        storageKey: targetRelPath,
+        url: storage.getUrl(targetRelPath),
+      };
+    }
+
+    // Clean up empty staging folder
+    try {
+      if (fs.existsSync(stagingAbsDir)) await fs.promises.rmdir(stagingAbsDir);
+    } catch {}
+
+    // Atomic DB commit: update track and parent release review history
+    await sql.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(734821, 1)`;
+
+      const [track] = await tx<Record<string, any>[]>`
+        SELECT release_id, title, plugg_track_id FROM tracks WHERE id = ${trackId} FOR UPDATE
+      `;
+      if (!track) throw new Error("Track not found");
+      const releaseId = track["releaseId"] ?? track["release_id"];
+      const pluggTrackId = track["pluggTrackId"] ?? track["plugg_track_id"] ?? trackId;
+
+      await tx`
+        UPDATE tracks
+        SET
+          audio_url = ${`/api/stream/${cleanMasterKey}`},
+          file_hash = ${fileHash},
+          audio_variants = ${tx.json(finalVariants as any)},
+          technical_validation = ${tx.json(validation.properties as any)},
+          duration_seconds = COALESCE(NULLIF(${validation.properties.durationSeconds || 0}, 0), duration_seconds),
+          audio_processing_status = 'completed',
+          updated_at = now()
+        WHERE id = ${trackId}
+      `;
+
+      const [rel] = await tx<Record<string, any>[]>`
+        SELECT review_history FROM releases WHERE id = ${releaseId} FOR UPDATE
+      `;
+      const rawHistory = rel?.["reviewHistory"] ?? rel?.["review_history"];
+      const history = Array.isArray(rawHistory) ? rawHistory : [];
+      history.push({
+        id: crypto.randomUUID(),
+        action: "audio_replaced",
+        timestamp: new Date().toISOString(),
+        actorId: actorId || null,
+        actorName: actorName || "Artist",
+        feedback: `Replacement audio master uploaded and validated for track "${track["title"]}" (${pluggTrackId}).`,
+      });
+
+      await tx`
+        UPDATE releases
+        SET
+          review_history = ${tx.json(history)},
+          audio_processing_status = 'completed',
+          updated_at = now()
+        WHERE id = ${releaseId}
+      `;
+    });
+
+    return {
+      success: true,
+      variants: finalVariants,
+      technicalValidation: validation.properties,
+    };
+  } catch (err: any) {
+    console.error(`Audio replacement failed for track ${trackId}:`, err);
+
+    // Clean up staging files on failure
+    for (const f of stagedFiles) {
+      try {
+        if (fs.existsSync(f)) await fs.promises.unlink(f);
+      } catch {}
+    }
+    try {
+      if (fs.existsSync(stagingAbsDir)) await fs.promises.rmdir(stagingAbsDir);
+    } catch {}
+
+    // Notice: Existing track master and variants were NOT touched!
+    return {
+      success: false,
+      error: err.message || "Replacement audio transcoding failed",
+      variants: {},
+      technicalValidation: validation.properties,
+    };
+  }
+}
+

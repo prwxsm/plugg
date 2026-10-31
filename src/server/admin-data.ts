@@ -10,6 +10,7 @@ import type {
   AdminGenre,
   AdminUser,
   AdminPlay,
+  AdminComplaint,
 } from "../components/admin/model.ts";
 import type { TransactionSql } from "postgres";
 
@@ -153,6 +154,8 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
   SELECT r.id,r.title,r.type,r.artist_id,a.display_name AS artist_name,r.cover_url,r.label,
    r.release_date::text,r.go_live_at,r.status,r.review_submitted_at,r.reviewed_at,
    r.review_feedback,r.audio_processing_status,r.review_history,
+   r.uploader_role, (r.rights_declaration_text IS NOT NULL) AS rights_declaration_accepted, r.rights_declaration_version, r.rights_declaration_timestamp,
+   r.rights_hold, r.rights_hold_reason, r.rights_hold_placed_at, r.rights_hold_placed_by,
    ARRAY(SELECT t.id FROM tracks t LEFT JOIN release_tracks rt ON rt.track_id=t.id AND rt.release_id=r.id
      WHERE t.release_id=r.id AND NOT t.is_mock ORDER BY rt.position NULLS LAST,t.created_at,t.id) AS track_ids
   FROM releases r JOIN artists a ON a.id=r.artist_id
@@ -162,11 +165,25 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
   SELECT t.id,t.plugg_track_id,t.title,t.artist_id,a.display_name AS artist_name,t.release_id,
    r.title AS release_title,r.status AS release_status,t.genre,t.cover_url,t.audio_url,
    t.duration_seconds,t.play_count,t.download_count,t.published,t.release_date::text,
-   t.features,t.producers,t.audio_processing_status,t.technical_validation,t.audio_variants
+   t.features,t.producers,t.audio_processing_status,t.technical_validation,t.audio_variants,
+   t.recording_type, t.has_samples_or_beats, t.sample_details, t.isrc, t.file_hash,
+   (SELECT count(*)::int FROM tracks other JOIN releases orl ON orl.id=other.release_id WHERE other.file_hash=t.file_hash AND other.id<>t.id AND other.artist_id<>t.artist_id AND orl.status IN ('processing','under_review','changes_required','scheduled','published')) AS foreign_duplicate_count
   FROM tracks t JOIN artists a ON a.id=t.artist_id JOIN releases r ON r.id=t.release_id
   JOIN artists ra ON ra.id=r.artist_id
   WHERE NOT t.is_mock AND NOT r.is_mock
   ORDER BY t.created_at DESC,t.id LIMIT ${RECORD_LIMIT}
+ `;
+  const complaintRows = await tx<Row[]>`
+  SELECT c.id, c.reference AS complaint_reference, c.release_id, c.track_id,
+   r.title AS release_title, t.title AS track_title, a.display_name AS artist_name,
+   c.complainant_name, c.complainant_email, COALESCE(c.conflict_nature, c.nature_of_infringement) AS conflict_nature, c.evidence_notes,
+   c.status, c.admin_notes, c.resolution_notes, c.created_at, c.updated_at,
+   c.resolved_at, c.resolved_by
+  FROM copyright_complaints c
+  LEFT JOIN releases r ON r.id = c.release_id
+  LEFT JOIN tracks t ON t.id = c.track_id
+  LEFT JOIN artists a ON a.id = r.artist_id
+  ORDER BY c.created_at DESC LIMIT 500
  `;
   const artistRows = await tx<Row[]>`
   SELECT id,display_name,username,avatar_url,location,city,country,primary_genre,phone_number,
@@ -223,7 +240,9 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
    (SELECT count(*) FROM real_tracks WHERE audio_processing_status='failed') AS failed,
    (SELECT count(*) FROM real_tracks WHERE audio_processing_status='pending') AS pending_audio,
    (SELECT count(*) FROM real_plays WHERE ip_address IS NOT NULL) AS plays_with_ip,
-   ((SELECT count(*) FROM artists WHERE is_mock)+(SELECT count(*) FROM releases WHERE is_mock)+(SELECT count(*) FROM tracks WHERE is_mock)+(SELECT count(*) FROM users WHERE is_mock)+(SELECT count(*) FROM genres WHERE is_mock)) AS excluded_seed_records
+   ((SELECT count(*) FROM artists WHERE is_mock)+(SELECT count(*) FROM releases WHERE is_mock)+(SELECT count(*) FROM tracks WHERE is_mock)+(SELECT count(*) FROM users WHERE is_mock)+(SELECT count(*) FROM genres WHERE is_mock)) AS excluded_seed_records,
+   (SELECT count(*) FROM real_releases WHERE rights_hold = true) AS rights_hold_count,
+   (SELECT count(*) FROM copyright_complaints WHERE status IN ('received', 'under_investigation')) AS open_complaints
  `;
   const daily = await tx<Row[]>`
   WITH days AS (SELECT generate_series((now() AT TIME ZONE 'Africa/Kampala')::date-6,(now() AT TIME ZONE 'Africa/Kampala')::date,interval '1 day')::date AS day),
@@ -254,6 +273,14 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
     reviewedAt: iso(r["reviewedAt"]),
     reviewFeedback: nullableText(r["reviewFeedback"]),
     audioProcessingStatus: text(r["audioProcessingStatus"]),
+    uploaderRole: nullableText(r["uploaderRole"]) || "owner",
+    rightsDeclarationAccepted: Boolean(r["rightsDeclarationAccepted"]),
+    rightsDeclarationVersion: nullableText(r["rightsDeclarationVersion"]),
+    rightsDeclarationTimestamp: iso(r["rightsDeclarationTimestamp"]),
+    rightsHold: Boolean(r["rightsHold"]),
+    rightsHoldReason: nullableText(r["rightsHoldReason"]),
+    rightsHoldPlacedAt: iso(r["rightsHoldPlacedAt"]),
+    rightsHoldPlacedBy: nullableText(r["rightsHoldPlacedBy"]),
     reviewHistory: reviewHistory(r["reviewHistory"]),
     trackIds: Array.isArray(r["trackIds"]) ? r["trackIds"].map(text) : [],
   }));
@@ -277,6 +304,12 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
     features: nullableText(t["features"]),
     producers: nullableText(t["producers"]),
     audioProcessingStatus: text(t["audioProcessingStatus"]),
+    recordingType: nullableText(t["recordingType"]) || "original",
+    hasSamplesOrBeats: Boolean(t["hasSamplesOrBeats"]),
+    sampleDetails: nullableText(t["sampleDetails"]),
+    isrc: nullableText(t["isrc"]),
+    fileHash: nullableText(t["fileHash"]),
+    duplicateMatchesCount: number(t["foreignDuplicateCount"]),
     technicalValidation: technicalMetadata(t["technicalValidation"]),
     audioVariants: Object.entries(jsonObject(t["audioVariants"])).map(([name, v]) => {
       const item = jsonObject(v);
@@ -289,6 +322,30 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
         sizeBytes: typeof item["sizeBytes"] === "number" ? item["sizeBytes"] : null,
       };
     }),
+  }));
+  const complaints: AdminComplaint[] = complaintRows.map((c) => ({
+    id: text(c["id"]),
+    complaintReference: text(c["complaintReference"]),
+    releaseId: nullableText(c["releaseId"]),
+    trackId: nullableText(c["trackId"]),
+    releaseTitle: nullableText(c["releaseTitle"]),
+    trackTitle: nullableText(c["trackTitle"]),
+    artistName: nullableText(c["artistName"]),
+    complainantName: text(c["complainantName"]),
+    complainantEmail: text(c["complainantEmail"]),
+    conflictNature: text(c["conflictNature"]),
+    evidenceNotes: nullableText(c["evidenceNotes"]),
+    status: (["received", "under_investigation", "resolved", "dismissed"].includes(
+      String(c["status"]),
+    )
+      ? c["status"]
+      : "received") as AdminComplaint["status"],
+    adminNotes: nullableText(c["adminNotes"]),
+    resolutionNotes: nullableText(c["resolutionNotes"]),
+    createdAt: iso(c["createdAt"]) || "",
+    updatedAt: iso(c["updatedAt"]) || "",
+    resolvedAt: iso(c["resolvedAt"]),
+    resolvedBy: nullableText(c["resolvedBy"]),
   }));
   const artists: AdminArtist[] = artistRows.map((a) => ({
     id: text(a["id"]),
@@ -338,6 +395,7 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
     artists,
     genres,
     users,
+    complaints,
     plays: plays.map((p) => ({
       id: text(p["id"]),
       createdAt: iso(p["createdAt"]) || "",

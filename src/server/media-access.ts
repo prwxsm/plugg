@@ -9,10 +9,10 @@ export async function canReadAudio(request: Request, key: string, connection: ty
     ?.slice("plugg_session=".length);
   return connection.begin("read only", async (tx) => {
     const tracks =
-      await tx`SELECT t.artist_id,t.published,r.status FROM tracks t JOIN releases r ON r.id=t.release_id
+      await tx`SELECT t.artist_id,t.published,r.status,coalesce(r.rights_hold, false) AS rights_hold FROM tracks t JOIN releases r ON r.id=t.release_id
    WHERE t.audio_url IN (${"/api/stream/" + encodeURIComponent(key)},${"/api/file/" + encodeURIComponent(key)},${"/api/stream/" + key},${"/api/file/" + key})
    OR starts_with(${key},'variants/'||t.id||'/')`;
-    if (tracks.some((t) => t["published"] && t["status"] === "published")) return true;
+    if (tracks.some((t) => t["published"] && t["status"] === "published" && !(t["rightsHold"] ?? t["rights_hold"]))) return true;
     if (!cookie) return false;
     const [user] =
       await tx`SELECT u.id,u.artist_id,m.role FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN admin_memberships m ON m.user_id=u.id AND m.active WHERE s.id=${cookie} AND s.expires_at>now()`;

@@ -15,7 +15,7 @@ import { genres as seedGenres } from "@/data/genres";
 import { playlists as seedPlaylists } from "@/data/playlists";
 import { releases as seedReleases } from "@/data/releases";
 import { tracks as seedTracks } from "@/data/tracks";
-import type { Analytics, Artist, Genre, Playlist, Release, Track, User } from "@/data/types";
+import type { Analytics, Artist, Genre, Playlist, RecordingType, Release, Track, UploaderRole, User } from "@/data/types";
 import { goLiveAt, select, slugify } from "@/lib/plugg";
 import {
   toggleLikeTrackFn,
@@ -36,6 +36,7 @@ import {
   requestChangesReleaseFn,
   resubmitReleaseFn,
   retryTrackProcessingFn,
+  replaceTrackAudioFn,
 } from "@/server-fns/data-functions";
 import { logoutUser, updateUserProfileFn, deleteUserAccountFn } from "@/server-fns/auth-functions";
 import { useAuthPrompt } from "@/components/plugg/auth-prompt-modal";
@@ -122,6 +123,11 @@ export interface SongDraft {
   durationSeconds: number;
   file: { name: string; size: number } | null;
   audioUrl?: string | null;
+  recordingType?: RecordingType;
+  hasSamplesOrBeats?: boolean;
+  sampleDetails?: string;
+  isrc?: string;
+  fileHash?: string;
 }
 
 export interface UploadDraft {
@@ -135,6 +141,8 @@ export interface UploadDraft {
   releaseDate: string;
   songs: SongDraft[];
   savedAt: string;
+  uploaderRole?: UploaderRole;
+  rightsDeclarationAccepted?: boolean;
 }
 
 export const emptySongDraft = (defaultGenre = "Afrobeats"): SongDraft => ({
@@ -146,6 +154,10 @@ export const emptySongDraft = (defaultGenre = "Afrobeats"): SongDraft => ({
   durationSeconds: 0,
   file: null,
   audioUrl: null,
+  recordingType: "original",
+  hasSamplesOrBeats: false,
+  sampleDetails: "",
+  isrc: "",
 });
 
 export interface NewReleaseInput {
@@ -157,6 +169,8 @@ export interface NewReleaseInput {
   label?: string | undefined;
   releaseDate: string;
   songs: SongDraft[];
+  uploaderRole?: UploaderRole;
+  rightsDeclarationAccepted?: boolean;
 }
 
 export interface NewArtistInput {
@@ -233,6 +247,7 @@ interface PluggContextValue {
   requestChangesRelease: (releaseId: string, feedback: string) => Promise<void>;
   resubmitRelease: (releaseId: string, releaseDate?: string, notes?: string) => Promise<void>;
   retryTrackProcessing: (trackId: string) => Promise<void>;
+  replaceTrackAudio: (trackId: string, audioUrl: string, durationSeconds?: number) => Promise<any>;
   // notifications
   notifications: PluggNotification[];
   clearNotification: (id: string) => void;
@@ -1239,6 +1254,11 @@ export function PluggProvider({
         producers: song.producers,
         lyrics: song.lyrics,
         audioProcessingStatus: "completed",
+        recordingType: song.recordingType || "original",
+        hasSamplesOrBeats: song.hasSamplesOrBeats,
+        sampleDetails: song.sampleDetails,
+        isrc: song.isrc,
+        fileHash: song.fileHash,
       }));
 
       const release: Release = {
@@ -1256,8 +1276,11 @@ export function PluggProvider({
         reviewSubmittedAt,
         audioProcessingStatus: "completed",
         trackIds: newTracks.map((t) => t.id),
+        uploaderRole: input.uploaderRole || "owner",
+        rightsDeclarationAccepted: input.rightsDeclarationAccepted,
+        rightsDeclarationTimestamp: input.rightsDeclarationAccepted ? reviewSubmittedAt : undefined,
+        rightsDeclarationVersion: input.rightsDeclarationAccepted ? "2026-10-31.1" : undefined,
       };
-
 
       setTracks((prev) => [...newTracks, ...prev]);
       setReleases((prev) => [release, ...prev]);
@@ -1276,6 +1299,8 @@ export function PluggProvider({
             releaseDate: input.releaseDate,
             goLiveAt: goLiveTime,
             status: releaseStatus,
+            uploaderRole: input.uploaderRole || "owner",
+            rightsDeclarationAccepted: input.rightsDeclarationAccepted,
           },
           songs: list.map((s) => ({
             title: s.title,
@@ -1285,6 +1310,10 @@ export function PluggProvider({
             lyrics: s.lyrics,
             durationSeconds: s.durationSeconds,
             audioUrl: s.audioUrl || undefined,
+            recordingType: s.recordingType || "original",
+            hasSamplesOrBeats: s.hasSamplesOrBeats,
+            sampleDetails: s.sampleDetails,
+            isrc: s.isrc,
           })),
         },
       }).catch((err) => console.warn("Could not save release to database:", err));
@@ -1388,6 +1417,31 @@ export function PluggProvider({
         toast.info("Audio processing restarted.");
       } catch (err: any) {
         toast.error(err.message || "Failed to retry audio processing");
+        throw err;
+      }
+    },
+    replaceTrackAudio: async (trackId: string, audioUrl: string, durationSeconds?: number) => {
+      try {
+        const res = await replaceTrackAudioFn({ data: { trackId, audioUrl, durationSeconds } });
+        if (!res.success) {
+          throw new Error("Failed to process replacement audio");
+        }
+        setTracks((prev) =>
+          prev.map((t) =>
+            t.id === trackId
+              ? {
+                  ...t,
+                  audioUrl,
+                  durationSeconds: durationSeconds || t.durationSeconds,
+                  audioProcessingStatus: "completed",
+                }
+              : t
+          )
+        );
+        toast.success("Corrected master audio processed and updated!");
+        return res;
+      } catch (err: any) {
+        toast.error(err.message || "Failed to replace audio");
         throw err;
       }
     },

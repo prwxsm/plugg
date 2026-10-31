@@ -26,6 +26,7 @@ import { Route as UploadRouteImport } from './routes/upload'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminArtistsRouteImport } from './routes/admin.artists'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
+import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
 import { Route as AdminGenresRouteImport } from './routes/admin.genres'
 import { Route as AdminProcessingRouteImport } from './routes/admin.processing'
 import { Route as AdminReviewQueueRouteImport } from './routes/admin.review-queue'
@@ -125,6 +126,11 @@ const AdminCatalogRoute = AdminCatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
+  id: '/complaints',
+  path: '/complaints',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGenresRoute = AdminGenresRouteImport.update({
   id: '/genres',
   path: '/genres',
@@ -209,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/artists': typeof AdminArtistsRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/processing': typeof AdminProcessingRoute
   '/admin/review-queue': typeof AdminReviewQueueRoute
@@ -241,6 +248,7 @@ export interface FileRoutesByTo {
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/artists': typeof AdminArtistsRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/processing': typeof AdminProcessingRoute
   '/admin/review-queue': typeof AdminReviewQueueRoute
@@ -274,6 +282,7 @@ export interface FileRoutesById {
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/artists': typeof AdminArtistsRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
   '/admin/genres': typeof AdminGenresRoute
   '/admin/processing': typeof AdminProcessingRoute
   '/admin/review-queue': typeof AdminReviewQueueRoute
@@ -308,6 +317,7 @@ export interface FileRouteTypes {
     | '/admin/analytics'
     | '/admin/artists'
     | '/admin/catalog'
+    | '/admin/complaints'
     | '/admin/genres'
     | '/admin/processing'
     | '/admin/review-queue'
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/admin/analytics'
     | '/admin/artists'
     | '/admin/catalog'
+    | '/admin/complaints'
     | '/admin/genres'
     | '/admin/processing'
     | '/admin/review-queue'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/admin/analytics'
     | '/admin/artists'
     | '/admin/catalog'
+    | '/admin/complaints'
     | '/admin/genres'
     | '/admin/processing'
     | '/admin/review-queue'
@@ -531,6 +543,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCatalogRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/complaints': {
+      id: '/admin/complaints'
+      path: '/complaints'
+      fullPath: '/admin/complaints'
+      preLoaderRoute: typeof AdminComplaintsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/genres': {
       id: '/admin/genres'
       path: '/genres'
@@ -629,6 +648,7 @@ interface AdminRouteChildren {
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminArtistsRoute: typeof AdminArtistsRoute
   AdminCatalogRoute: typeof AdminCatalogRoute
+  AdminComplaintsRoute: typeof AdminComplaintsRoute
   AdminGenresRoute: typeof AdminGenresRoute
   AdminProcessingRoute: typeof AdminProcessingRoute
   AdminReviewQueueRoute: typeof AdminReviewQueueRoute
@@ -642,6 +662,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminArtistsRoute: AdminArtistsRoute,
   AdminCatalogRoute: AdminCatalogRoute,
+  AdminComplaintsRoute: AdminComplaintsRoute,
   AdminGenresRoute: AdminGenresRoute,
   AdminProcessingRoute: AdminProcessingRoute,
   AdminReviewQueueRoute: AdminReviewQueueRoute,

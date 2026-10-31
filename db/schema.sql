@@ -77,26 +77,35 @@ CREATE TABLE genres (
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE releases (
-    id                      TEXT PRIMARY KEY,
-    artist_id               TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
-    title                   TEXT NOT NULL,
-    slug                    TEXT NOT NULL,
-    type                    release_type NOT NULL DEFAULT 'single',
-    cover_url               TEXT NOT NULL DEFAULT '',
-    release_date            DATE NOT NULL,
-    status                  release_status NOT NULL DEFAULT 'draft',
-    go_live_at              TIMESTAMPTZ,
-    description             TEXT,
-    label                   TEXT,
-    review_submitted_at     TIMESTAMPTZ,
-    reviewed_at             TIMESTAMPTZ,
-    reviewer_id             TEXT,
-    review_feedback         TEXT,
-    audio_processing_status TEXT NOT NULL DEFAULT 'completed',
-    technical_validation    JSONB NOT NULL DEFAULT '{}',
-    review_history          JSONB NOT NULL DEFAULT '[]',
-    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id                          TEXT PRIMARY KEY,
+    artist_id                   TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+    title                       TEXT NOT NULL,
+    slug                        TEXT NOT NULL,
+    type                        release_type NOT NULL DEFAULT 'single',
+    cover_url                   TEXT NOT NULL DEFAULT '',
+    release_date                DATE NOT NULL,
+    status                      release_status NOT NULL DEFAULT 'draft',
+    go_live_at                  TIMESTAMPTZ,
+    description                 TEXT,
+    label                       TEXT,
+    review_submitted_at         TIMESTAMPTZ,
+    reviewed_at                 TIMESTAMPTZ,
+    reviewer_id                 TEXT,
+    review_feedback             TEXT,
+    audio_processing_status     TEXT NOT NULL DEFAULT 'completed',
+    technical_validation        JSONB NOT NULL DEFAULT '{}',
+    review_history              JSONB NOT NULL DEFAULT '[]',
+    uploader_role               TEXT NOT NULL DEFAULT 'owner',
+    rights_declaration_text     TEXT,
+    rights_declaration_version  TEXT,
+    rights_declaration_timestamp TIMESTAMPTZ,
+    rights_declared_by_user_id  TEXT REFERENCES users(id) ON DELETE SET NULL,
+    rights_hold                 BOOLEAN NOT NULL DEFAULT FALSE,
+    rights_hold_reason          TEXT,
+    rights_hold_placed_at       TIMESTAMPTZ,
+    rights_hold_placed_by       TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (artist_id, slug)
 );
 
@@ -125,6 +134,11 @@ CREATE TABLE tracks (
     features                TEXT,
     producers               TEXT,
     lyrics                  TEXT,
+    recording_type          TEXT NOT NULL DEFAULT 'original',
+    has_samples_or_beats    BOOLEAN NOT NULL DEFAULT FALSE,
+    sample_details          TEXT,
+    isrc                    TEXT,
+    file_hash               TEXT,
     audio_processing_status TEXT NOT NULL DEFAULT 'completed',
     technical_validation    JSONB NOT NULL DEFAULT '{}',
     audio_variants          JSONB NOT NULL DEFAULT '{}',
@@ -142,6 +156,33 @@ CREATE TABLE release_tracks (
     track_id   TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
     position   INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (release_id, track_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- COPYRIGHT COMPLAINTS
+-- ---------------------------------------------------------------------------
+
+CREATE SEQUENCE IF NOT EXISTS copyright_complaint_seq START WITH 1 INCREMENT BY 1 NO MAXVALUE NO CYCLE;
+
+CREATE TABLE copyright_complaints (
+    id                       TEXT PRIMARY KEY,
+    reference                TEXT UNIQUE NOT NULL,
+    release_id               TEXT REFERENCES releases(id) ON DELETE SET NULL,
+    track_id                 TEXT REFERENCES tracks(id) ON DELETE SET NULL,
+    complainant_name         TEXT NOT NULL,
+    complainant_email        TEXT NOT NULL,
+    rights_holder_represented TEXT,
+    work_claimed             TEXT NOT NULL,
+    nature_of_infringement   TEXT NOT NULL,
+    evidence_notes           TEXT,
+    conflict_nature          TEXT,
+    status                   TEXT NOT NULL CHECK (status IN ('received', 'under_investigation', 'resolved', 'resolved_takedown', 'resolved_reinstated', 'dismissed')) DEFAULT 'received',
+    admin_notes              TEXT,
+    resolution_notes         TEXT,
+    created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at              TIMESTAMPTZ,
+    resolved_by              TEXT REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ---------------------------------------------------------------------------

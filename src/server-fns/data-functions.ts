@@ -10,7 +10,15 @@ import type {
   Analytics,
   User,
   ReleaseStatus,
+  RecordingType,
+  UploaderRole,
 } from "@/data/types";
+import {
+  PLUGG_RIGHTS_DECLARATION_TEXT,
+  PLUGG_RIGHTS_DECLARATION_VERSION,
+  isValidIsrc,
+  normalizeIsrc,
+} from "@/lib/rights-validation";
 import { fallbackAnalytics } from "@/data/analytics";
 import { goLiveAt, todayISO } from "@/lib/plugg";
 import { tracks as seedTracks } from "@/data/tracks";
@@ -120,6 +128,11 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
       features: string | null;
       producers: string | null;
       lyrics: string | null;
+      recordingType: any;
+      hasSamplesOrBeats: boolean | null;
+      sampleDetails: string | null;
+      isrc: string | null;
+      fileHash: string | null;
       audioProcessingStatus: "pending" | "processing" | "completed" | "failed" | null;
       technicalValidation: any;
       audioVariants: any;
@@ -128,6 +141,11 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     SELECT id, plugg_track_id, artist_id, release_id, title, slug, genre, cover_url, audio_url, 
            duration_seconds, play_count, COALESCE(download_count, 0) as download_count,
            COALESCE(like_count, 0) as like_count, published, release_date, features, producers, lyrics,
+           COALESCE(recording_type, 'original') as "recordingType",
+           COALESCE(has_samples_or_beats, false) as "hasSamplesOrBeats",
+           sample_details as "sampleDetails",
+           isrc,
+           file_hash as "fileHash",
            COALESCE(audio_processing_status, 'completed') as "audioProcessingStatus",
            COALESCE(technical_validation, '{}'::jsonb) as "technicalValidation",
            COALESCE(audio_variants, '{}'::jsonb) as "audioVariants"
@@ -157,6 +175,11 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     features: t.features || undefined,
     producers: t.producers || undefined,
     lyrics: t.lyrics || undefined,
+    recordingType: t.recordingType || "original",
+    hasSamplesOrBeats: Boolean(t.hasSamplesOrBeats),
+    sampleDetails: t.sampleDetails || undefined,
+    isrc: t.isrc || undefined,
+    fileHash: t.fileHash || undefined,
     audioProcessingStatus: t.audioProcessingStatus || "completed",
     technicalValidation:
       t.technicalValidation && Object.keys(t.technicalValidation).length > 0
@@ -200,6 +223,16 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
       audioProcessingStatus: "pending" | "processing" | "completed" | "failed" | null;
       technicalValidation: any;
       reviewHistory: any;
+      uploaderRole: any;
+      rightsDeclarationAccepted: boolean | null;
+      rightsDeclarationText: string | null;
+      rightsDeclarationVersion: string | null;
+      rightsDeclarationTimestamp: Date | string | null;
+      rightsDeclaredByUserId: string | null;
+      rightsHold: boolean | null;
+      rightsHoldReason: string | null;
+      rightsHoldPlacedAt: Date | string | null;
+      rightsHoldPlacedBy: string | null;
     }[]
   >`
     SELECT id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at, description, label,
@@ -209,7 +242,17 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
            review_feedback as "reviewFeedback",
            COALESCE(audio_processing_status, 'completed') as "audioProcessingStatus",
            COALESCE(technical_validation, '{}'::jsonb) as "technicalValidation",
-           COALESCE(review_history, '[]'::jsonb) as "reviewHistory"
+           COALESCE(review_history, '[]'::jsonb) as "reviewHistory",
+           COALESCE(uploader_role, 'owner') as "uploaderRole",
+           COALESCE(rights_declaration_accepted, false) as "rightsDeclarationAccepted",
+           rights_declaration_text as "rightsDeclarationText",
+           rights_declaration_version as "rightsDeclarationVersion",
+           rights_declaration_timestamp as "rightsDeclarationTimestamp",
+           rights_declaration_user_id as "rightsDeclaredByUserId",
+           COALESCE(rights_hold, false) as "rightsHold",
+           rights_hold_reason as "rightsHoldReason",
+           rights_hold_placed_at as "rightsHoldPlacedAt",
+           rights_hold_placed_by as "rightsHoldPlacedBy"
     FROM releases
     ORDER BY release_date DESC
   `;
@@ -256,6 +299,24 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
           ? r.technicalValidation
           : undefined,
       reviewHistory: Array.isArray(r.reviewHistory) ? r.reviewHistory : undefined,
+      uploaderRole: r.uploaderRole || "owner",
+      rightsDeclarationAccepted: Boolean(r.rightsDeclarationAccepted),
+      rightsDeclarationText: r.rightsDeclarationText || undefined,
+      rightsDeclarationVersion: r.rightsDeclarationVersion || undefined,
+      rightsDeclarationTimestamp: r.rightsDeclarationTimestamp
+        ? r.rightsDeclarationTimestamp instanceof Date
+          ? r.rightsDeclarationTimestamp.toISOString()
+          : String(r.rightsDeclarationTimestamp)
+        : undefined,
+      rightsDeclaredByUserId: r.rightsDeclaredByUserId || undefined,
+      rightsHold: Boolean(r.rightsHold),
+      rightsHoldReason: r.rightsHoldReason || undefined,
+      rightsHoldPlacedAt: r.rightsHoldPlacedAt
+        ? r.rightsHoldPlacedAt instanceof Date
+          ? r.rightsHoldPlacedAt.toISOString()
+          : String(r.rightsHoldPlacedAt)
+        : undefined,
+      rightsHoldPlacedBy: r.rightsHoldPlacedBy || undefined,
     };
   });
 
@@ -753,6 +814,8 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         releaseDate: string;
         goLiveAt?: string | undefined;
         status?: ReleaseStatus | undefined;
+        uploaderRole?: UploaderRole | undefined;
+        rightsDeclarationAccepted?: boolean | undefined;
       };
       songs: {
         title: string;
@@ -762,6 +825,11 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         lyrics?: string | undefined;
         durationSeconds: number;
         audioUrl?: string | undefined;
+        recordingType?: RecordingType | undefined;
+        hasSamplesOrBeats?: boolean | undefined;
+        sampleDetails?: string | undefined;
+        isrc?: string | undefined;
+        fileHash?: string | undefined;
       }[];
     }) => data,
   )
@@ -772,6 +840,14 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     }
 
     const { release, songs } = data;
+
+    // Validate mandatory copyright declaration for non-draft submissions
+    const isDraft = release.status === "draft";
+    if (!isDraft && !release.rightsDeclarationAccepted) {
+      throw new Error(
+        "Mandatory copyright declaration must be confirmed before submitting for review.",
+      );
+    }
 
     const releaseId = crypto.randomUUID();
     const baseSlug =
@@ -786,7 +862,6 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
       : new Date(goLiveAt(release.releaseDate));
 
     // New submissions enter processing -> under_review workflow unless explicitly saved as draft
-    const isDraft = release.status === "draft";
     const initialStatus: ReleaseStatus = isDraft ? "draft" : "under_review";
     const initialProcessingStatus = isDraft ? "completed" : "processing";
     const reviewHistory = isDraft
@@ -801,13 +876,88 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           },
         ];
 
+    // Pre-resolve song hashes and validate ISRCs
+    let initialRightsHold = false;
+    let initialRightsHoldReason: string | null = null;
+
+    const processedSongs: {
+      song: (typeof songs)[number];
+      fileHash: string | null;
+      normIsrc: string | null;
+    }[] = [];
+
+    for (const song of songs) {
+      // 1. Resolve SHA-256 hash
+      let hash = song.fileHash || null;
+      if (!hash && song.audioUrl) {
+        const cleanKey = decodeURIComponent(
+          song.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, ""),
+        );
+        const [fileRow] = await sql<{ file_hash: string | null }[]>`
+          SELECT file_hash FROM files WHERE storage_key = ${cleanKey} LIMIT 1
+        `;
+        if (fileRow?.file_hash) hash = fileRow.file_hash;
+      }
+
+      // 2. Validate and normalize ISRC if supplied
+      let normIsrc: string | null = null;
+      if (song.isrc) {
+        if (!isValidIsrc(song.isrc)) {
+          throw new Error(
+            `Invalid ISRC format: "${song.isrc}". Official ISRC must be 12 alphanumeric characters (e.g. US-RC1-76-04981).`,
+          );
+        }
+        normIsrc = normalizeIsrc(song.isrc);
+      }
+
+      // 3. Duplicate detection across accounts
+      if (hash) {
+        const matches = await sql<{ id: string; artist_id: string; title: string }[]>`
+          SELECT t.id, t.artist_id, t.title
+          FROM tracks t
+          JOIN releases r ON r.id = t.release_id
+          WHERE t.file_hash = ${hash}
+            AND r.status IN ('processing', 'under_review', 'changes_required', 'scheduled', 'published')
+          LIMIT 5
+        `;
+        const foreignMatch = matches.find((m) => m.artist_id !== user.artistId);
+        if (foreignMatch) {
+          // Different account exact same file: Flag for rights review, hold release from auto-publishing
+          initialRightsHold = true;
+          initialRightsHoldReason = `Exact audio duplicate match detected across accounts. Release held for copyright review.`;
+        }
+      }
+
+      // 4. ISRC conflict detection across accounts
+      if (normIsrc) {
+        const isrcMatches = await sql<{ id: string; artist_id: string }[]>`
+          SELECT id, artist_id FROM tracks WHERE isrc = ${normIsrc} LIMIT 5
+        `;
+        const foreignIsrcMatch = isrcMatches.find((m) => m.artist_id !== user.artistId);
+        if (foreignIsrcMatch) {
+          initialRightsHold = true;
+          initialRightsHoldReason = `ISRC conflict (${normIsrc}) detected across accounts. Release held for administrative review.`;
+        }
+      }
+
+      processedSongs.push({ song, fileHash: hash, normIsrc });
+    }
+
     const createdTrackJobs: { trackId: string; audioUrl: string | null }[] = [];
+
+    const declarationAccepted = !isDraft && Boolean(release.rightsDeclarationAccepted);
+    const declarationText = declarationAccepted ? PLUGG_RIGHTS_DECLARATION_TEXT : null;
+    const declarationVersion = declarationAccepted ? PLUGG_RIGHTS_DECLARATION_VERSION : null;
+    const declarationUserId = declarationAccepted ? user.id : null;
 
     await sql.begin(async (tx) => {
       await tx`
         INSERT INTO releases (
           id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at,
-          description, label, review_submitted_at, audio_processing_status, review_history, is_mock
+          description, label, review_submitted_at, audio_processing_status, review_history, is_mock,
+          uploader_role, rights_declaration_accepted, rights_declaration_text, rights_declaration_version,
+          rights_declaration_timestamp, rights_declaration_user_id,
+          rights_hold, rights_hold_reason, rights_hold_placed_at, rights_hold_placed_by
         )
         VALUES (
           ${releaseId},
@@ -824,13 +974,24 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           ${isDraft ? null : sql`now()`},
           ${initialProcessingStatus},
           ${JSON.stringify(reviewHistory)},
-          false
+          false,
+          ${release.uploaderRole || "owner"},
+          ${declarationAccepted},
+          ${declarationText},
+          ${declarationVersion},
+          ${declarationAccepted ? sql`now()` : null},
+          ${declarationUserId},
+          ${initialRightsHold},
+          ${initialRightsHoldReason},
+          ${initialRightsHold ? sql`now()` : null},
+          ${initialRightsHold ? "system" : null}
         )
       `;
 
-      for (let i = 0; i < songs.length; i++) {
-        const song = songs[i];
-        if (!song) continue;
+      for (let i = 0; i < processedSongs.length; i++) {
+        const item = processedSongs[i];
+        if (!item) continue;
+        const { song, fileHash, normIsrc } = item;
         const trackId = crypto.randomUUID();
         const songBaseSlug =
           song.title
@@ -852,6 +1013,7 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           INSERT INTO tracks (
             id, plugg_track_id, artist_id, release_id, title, slug, genre, cover_url, audio_url,
             duration_seconds, play_count, published, release_date, features, producers, lyrics,
+            recording_type, has_samples_or_beats, sample_details, isrc, file_hash,
             audio_processing_status, is_mock
           )
           VALUES (
@@ -871,6 +1033,11 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
             ${song.features || null},
             ${song.producers || null},
             ${song.lyrics || null},
+            ${song.recordingType || "original"},
+            ${Boolean(song.hasSamplesOrBeats)},
+            ${song.sampleDetails || null},
+            ${normIsrc},
+            ${fileHash},
             ${initialProcessingStatus},
             false
           )
@@ -918,7 +1085,13 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
       })();
     }
 
-    return { success: true, releaseId, status: initialStatus };
+    return {
+      success: true,
+      releaseId,
+      status: initialStatus,
+      rightsHold: initialRightsHold,
+      rightsHoldReason: initialRightsHoldReason,
+    };
   });
 
 export const approveReleaseFn = createServerFn({ method: "POST" })
@@ -1033,6 +1206,10 @@ export const updateTrackFn = createServerFn({ method: "POST" })
         features?: string | undefined;
         producers?: string | undefined;
         lyrics?: string | undefined;
+        recordingType?: RecordingType | undefined;
+        hasSamplesOrBeats?: boolean | undefined;
+        sampleDetails?: string | undefined;
+        isrc?: string | undefined;
       };
     }) => data,
   )
@@ -1043,6 +1220,17 @@ export const updateTrackFn = createServerFn({ method: "POST" })
     }
 
     const { trackId, patch } = data;
+
+    let normIsrc: string | null | undefined = undefined;
+    if (patch.isrc !== undefined) {
+      if (patch.isrc && !isValidIsrc(patch.isrc)) {
+        throw new Error(
+          `Invalid ISRC format: "${patch.isrc}". Must be 12 alphanumeric characters.`,
+        );
+      }
+      normIsrc = patch.isrc ? normalizeIsrc(patch.isrc) : null;
+    }
+
     await sql`
       UPDATE tracks
       SET
@@ -1050,10 +1238,129 @@ export const updateTrackFn = createServerFn({ method: "POST" })
         features = COALESCE(${patch.features ?? null}, features),
         producers = COALESCE(${patch.producers ?? null}, producers),
         lyrics = COALESCE(${patch.lyrics ?? null}, lyrics),
+        recording_type = COALESCE(${patch.recordingType ?? null}, recording_type),
+        has_samples_or_beats = COALESCE(${patch.hasSamplesOrBeats ?? null}, has_samples_or_beats),
+        sample_details = COALESCE(${patch.sampleDetails ?? null}, sample_details),
+        isrc = CASE WHEN ${patch.isrc !== undefined} THEN ${normIsrc ?? null} ELSE isrc END,
         updated_at = now()
       WHERE id = ${trackId} AND artist_id = ${user.artistId}
     `;
     return { success: true };
+  });
+
+export const replaceTrackAudioFn = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      trackId: string;
+      audioUrl: string;
+      durationSeconds?: number | undefined;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    if (!user || user.accountType !== "artist" || !user.artistId) {
+      throw new Error("Unauthorized: Artist account required");
+    }
+
+    const { trackId, audioUrl } = data;
+
+    // Verify track ownership and allowed replacement state
+    const [track] = await sql<
+      {
+        id: string;
+        release_id: string;
+        artist_id: string;
+        plugg_track_id: string;
+        title: string;
+        status: ReleaseStatus;
+      }[]
+    >`
+      SELECT t.id, t.release_id, t.artist_id, t.plugg_track_id, t.title, r.status
+      FROM tracks t
+      JOIN releases r ON r.id = t.release_id
+      WHERE t.id = ${trackId} AND t.artist_id = ${user.artistId}
+    `;
+
+    if (!track) {
+      throw new Error("Track not found or you are not authorized to edit it.");
+    }
+
+    if (!["changes_required", "draft", "under_review"].includes(track.status)) {
+      throw new Error(
+        "Audio replacement is only permitted for releases in Changes Required, Draft, or Under Review status.",
+      );
+    }
+
+    const cleanKey = decodeURIComponent(
+      audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, ""),
+    );
+
+    const { replaceTrackAudioMaster } = await import("@/server/audio-processor");
+    const result = await replaceTrackAudioMaster(cleanKey, trackId, user.id, user.name);
+
+    if (!result.success) {
+      throw new Error(result.error || "Failed to process replacement audio");
+    }
+
+    return {
+      success: true,
+      trackId,
+      pluggTrackId: track.plugg_track_id,
+      variants: result.variants,
+      technicalValidation: result.technicalValidation,
+    };
+  });
+
+export const checkAudioDuplicateFn = createServerFn({ method: "POST" })
+  .validator((data: { fileHash: string }) => data)
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    const { fileHash } = data;
+    if (!fileHash) return { isDuplicate: false, sameArtist: false };
+
+    const matches = await sql<
+      {
+        id: string;
+        artist_id: string;
+        title: string;
+        release_id: string;
+        release_title: string;
+        isrc: string | null;
+      }[]
+    >`
+      SELECT t.id, t.artist_id, t.title, t.release_id, r.title as release_title, t.isrc
+      FROM tracks t
+      JOIN releases r ON r.id = t.release_id
+      WHERE t.file_hash = ${fileHash}
+        AND r.status IN ('processing', 'under_review', 'changes_required', 'scheduled', 'published')
+      LIMIT 1
+    `;
+
+    if (matches.length === 0) {
+      return { isDuplicate: false, sameArtist: false };
+    }
+
+    const match = matches[0]!;
+    const sameArtist = Boolean(user?.artistId && match.artist_id === user.artistId);
+
+    // If same artist, return release and track info so they can navigate or reuse safely
+    if (sameArtist) {
+      return {
+        isDuplicate: true,
+        sameArtist: true,
+        existingTrackId: match.id,
+        existingTrackTitle: match.title,
+        existingReleaseId: match.release_id,
+        existingReleaseTitle: match.release_title,
+        isrc: match.isrc || undefined,
+      };
+    }
+
+    // If different artist, strictly protect private metadata and identity
+    return {
+      isDuplicate: true,
+      sameArtist: false,
+    };
   });
 
 export const deleteReleaseFn = createServerFn({ method: "POST" })
