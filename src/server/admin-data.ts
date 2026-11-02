@@ -1,3 +1,4 @@
+import { localAudioProcessingEnabled } from "./processing-mode.ts";
 import sql from "../lib/db.ts";
 import { requireAdminSession, AdminAuthorizationError } from "./admin-rbac.ts";
 import { jsonObject, reviewHistory, safeMediaUrl } from "../components/admin/model.ts";
@@ -304,6 +305,7 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
     features: nullableText(t["features"]),
     producers: nullableText(t["producers"]),
     audioProcessingStatus: text(t["audioProcessingStatus"]),
+    processingAvailable: localAudioProcessingEnabled(),
     recordingType: nullableText(t["recordingType"]) || "original",
     hasSamplesOrBeats: Boolean(t["hasSamplesOrBeats"]),
     sampleDetails: nullableText(t["sampleDetails"]),

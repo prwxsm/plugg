@@ -1,3 +1,4 @@
+import { limitLogin } from "../server/login-rate-limit.ts";
 import { createServerFn } from "@tanstack/react-start";
 import sql from "@/lib/db";
 import {
@@ -141,7 +142,9 @@ export const loginUser = createServerFn({ method: "POST" })
       throw new Error("Email or username and password are required");
     }
 
+    if (rawIdentifier.length > 254 || password.length > 200) throw new Error("Invalid sign-in fields");
     const normalized = rawIdentifier.toLowerCase();
+    if (limitLogin(normalized)) throw new Error("Too many sign-in attempts. Please try again later.");
 
     const [user] = await sql<
       {

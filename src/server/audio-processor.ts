@@ -1,3 +1,4 @@
+import { requireLocalAudioProcessing } from "./processing-mode";
 import fs from "node:fs";
 import path from "node:path";
 import { exec } from "node:child_process";
@@ -85,6 +86,7 @@ export async function probeAndValidateAudio(filePath: string): Promise<{
   qualityWarning?: string | undefined;
   properties: TechnicalValidation;
 }> {
+  requireLocalAudioProcessing();
   // 1. First run fast binary header inspection
   let headerValidation: ReturnType<typeof inspectAudioHeader> | null = null;
   try {
@@ -342,6 +344,7 @@ export async function processMasterAudio(
   trackId: string,
   persist = true,
 ): Promise<ProcessAudioResult> {
+  requireLocalAudioProcessing();
   const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
 
   const cleanMasterKey = path.normalize(masterStorageKey).replace(/^(\.\.(\/|\\|$))+/, "");
@@ -573,6 +576,7 @@ export async function replaceTrackAudioMaster(
   actorId?: string,
   actorName?: string,
 ): Promise<ProcessAudioResult> {
+  requireLocalAudioProcessing();
   const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
   const cleanMasterKey = path.normalize(replacementStorageKey).replace(/^(\.\.(\/|\\|$))+/, "").replace(/\\/g, "/");
   let masterFilePath: string;

@@ -1,3 +1,4 @@
+import { localAudioProcessingEnabled } from "../processing-mode";
 import fs from "node:fs";
 import path from "node:path";
 import sql from "@/lib/db";
@@ -8,6 +9,13 @@ export async function handleUploadRequest(request: Request): Promise<Response> {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // No cloud uploads until private storage credentials and authenticated processing are ready.
+  if (!localAudioProcessingEnabled()) {
+    return Response.json({ error: "Cloud uploads are not available yet. Upload and process files through the local Plugg application." }, {
+      status: 503, headers: { "Cache-Control": "no-store" },
     });
   }
 

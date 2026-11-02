@@ -861,9 +861,12 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
       ? new Date(release.goLiveAt)
       : new Date(goLiveAt(release.releaseDate));
 
+    const { localAudioProcessingEnabled } = await import("@/server/processing-mode");
+    const processingEnabled = localAudioProcessingEnabled();
+
     // New submissions enter processing -> under_review workflow unless explicitly saved as draft
-    const initialStatus: ReleaseStatus = isDraft ? "draft" : "under_review";
-    const initialProcessingStatus = isDraft ? "completed" : "processing";
+    const initialStatus: ReleaseStatus = isDraft ? "draft" : processingEnabled ? "under_review" : "processing";
+    const initialProcessingStatus = isDraft ? "completed" : processingEnabled ? "processing" : "pending";
     const reviewHistory = isDraft
       ? []
       : [
@@ -1053,7 +1056,7 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     });
 
     // Run audio variant generation in background / async for real audio files
-    if (!isDraft && createdTrackJobs.length > 0) {
+    if (processingEnabled && !isDraft && createdTrackJobs.length > 0) {
       (async () => {
         try {
           const { processMasterAudio } = await import("@/server/audio-processor");

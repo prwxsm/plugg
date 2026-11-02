@@ -89,7 +89,9 @@ export function AdminActions({
     [message, setMessage] = useState("");
 
   const isModerator = data.currentUser.role === "moderator";
-  const rawAllowed = pageActions[page] || [];
+  const rawAllowed = (pageActions[page] || []).filter(
+    (action) => action !== "retry_audio" || data.tracks.some((track) => track.processingAvailable !== false),
+  );
   // Moderators cannot execute final copyright takedowns/reinstatements/hold releases or staff actions
   const allowed = rawAllowed.filter(
     (a) =>

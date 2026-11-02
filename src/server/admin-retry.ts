@@ -1,3 +1,4 @@
+import { requireLocalAudioProcessing } from "./processing-mode.ts";
 import sql from "../lib/db.ts";
 import { requirePermission, type AdminPrincipal } from "./admin-rbac.ts";
 import type { ProcessAudioResult } from "./audio-processor";
@@ -9,6 +10,7 @@ export async function retryAudio(
   connection: typeof sql = sql,
   processor?: (key: string, id: string) => Promise<ProcessAudioResult>,
 ) {
+  requireLocalAudioProcessing();
   z.string().min(1).max(100).parse(trackId);
   const claim = await connection.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(734821,1)`;

@@ -1,7 +1,9 @@
 import { canReadAudio } from "../media-access";
-import fs from "node:fs";
+import { getStorageProvider } from "../../lib/storage";
+import { validateStorageKey } from "../../lib/storage/media-key";
+import { storedResponse } from "./stored-response";
 import path from "node:path";
-import { Readable } from "node:stream";
+
 
 export async function handleStreamRequest(request: Request, key: string): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -18,15 +20,10 @@ export async function handleStreamRequest(request: Request, key: string): Promis
     return new Response("Forbidden", { status: 403 });
   if (!(await canReadAudio(request, decodedKey)))
     return new Response("Media unavailable", { status: 404 });
-  const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
-
-  // Normalize key and prevent directory traversal
-  const normalizedKey = path.normalize(decodeURIComponent(key)).replace(/^(\.\.(\/|\\|$))+/, "");
-  let filePath = path.join(baseDir, normalizedKey);
-
-  if (!filePath.startsWith(baseDir + path.sep)) {
-    return new Response("Forbidden", { status: 403 });
-  }
+  try { validateStorageKey(decodedKey); } catch { return new Response("Forbidden", { status: 403 }); }
+  const storage = getStorageProvider();
+  const normalizedKey = decodedKey;
+  let filePath = decodedKey;
 
   const url = new URL(request.url);
   const quality = url.searchParams.get("quality");
@@ -93,112 +90,23 @@ export async function handleStreamRequest(request: Request, key: string): Promis
 
     for (const vName of candidateVariantNames) {
       const candidates = [
-        path.join(path.dirname(filePath), vName),
-        path.join(baseDir, "variants", fileBase, vName),
-        path.join(baseDir, "variants", path.basename(path.dirname(filePath)), vName),
+        path.posix.join(path.posix.dirname(filePath), vName),
+        path.posix.join("variants", fileBase, vName),
+        path.posix.join("variants", path.basename(path.dirname(filePath)), vName),
       ];
       if (dbTrackId) {
-        candidates.unshift(path.join(baseDir, "variants", dbTrackId, vName));
+        candidates.unshift(path.posix.join("variants", dbTrackId, vName));
       }
-      const match = candidates.find((c) => fs.existsSync(c));
-      if (match) {
-        filePath = match;
-        break;
+      let found = false;
+      for (const candidate of [...new Set(candidates)]) {
+        try { validateStorageKey(candidate); } catch { continue; }
+        // Recheck the chosen object, including client-supplied trackId candidates.
+        if (!(await canReadAudio(request, candidate))) continue;
+        if (await storage.headFile(candidate)) { filePath = candidate; found = true; break; }
       }
+      if (found) break;
     }
   }
 
-  let stat: fs.Stats;
-  try {
-    stat = await fs.promises.stat(filePath);
-  } catch {
-    return new Response("File not found", { status: 404 });
-  }
-
-  const fileSize = stat.size;
-  const mimeType = getAudioMimeType(filePath);
-
-  const range = request.headers.get("range");
-
-  if (range) {
-    const parts = range.replace(/bytes=/, "").split("-");
-    const firstPart = parts[0] ?? "";
-    const secondPart = parts[1];
-    const start = parseInt(firstPart, 10);
-    const end = secondPart ? parseInt(secondPart, 10) : fileSize - 1;
-
-    if (isNaN(start) || start >= fileSize || (parts[1] && end < start)) {
-      return new Response("Requested range not satisfiable", {
-        status: 416,
-        headers: { "Content-Range": `bytes */${fileSize}` },
-      });
-    }
-
-    const safeEnd = Math.min(end, fileSize - 1);
-    const chunkSize = safeEnd - start + 1;
-    const nodeStream = fs.createReadStream(filePath, { start, end: safeEnd });
-    const webStream = Readable.toWeb(nodeStream);
-
-    const url = new URL(request.url);
-    const downloadName = url.searchParams.get("filename") || url.searchParams.get("download");
-    const disposition = downloadName
-      ? `attachment; filename="${downloadName.replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`
-      : "inline";
-
-    return new Response(webStream as ReadableStream, {
-      status: 206,
-      headers: {
-        "Content-Range": `bytes ${start}-${safeEnd}/${fileSize}`,
-        "Accept-Ranges": "bytes",
-        "Content-Length": String(chunkSize),
-        "Content-Type": mimeType,
-        "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": disposition,
-        "Cache-Control": "private, no-store",
-      },
-    });
-  }
-
-  const nodeStream = fs.createReadStream(filePath);
-  const webStream = Readable.toWeb(nodeStream);
-
-  const downloadName = url.searchParams.get("filename") || url.searchParams.get("download");
-  const disposition = downloadName
-    ? `attachment; filename="${downloadName.replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`
-    : "inline";
-
-  return new Response(webStream as ReadableStream, {
-    status: 200,
-    headers: {
-      "Accept-Ranges": "bytes",
-      "Content-Length": String(fileSize),
-      "Content-Type": mimeType,
-      "X-Content-Type-Options": "nosniff",
-      "Content-Disposition": disposition,
-      "Cache-Control": "private, no-store",
-    },
-  });
-}
-
-function getAudioMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  switch (ext) {
-    case ".mp3":
-      return "audio/mpeg";
-    case ".wav":
-      return "audio/wav";
-    case ".ogg":
-    case ".opus":
-      return "audio/ogg";
-    case ".webm":
-      return "audio/webm";
-    case ".m4a":
-      return "audio/mp4";
-    case ".aac":
-      return "audio/aac";
-    case ".flac":
-      return "audio/flac";
-    default:
-      return "audio/mpeg";
-  }
+  return storedResponse(request, filePath, storage);
 }

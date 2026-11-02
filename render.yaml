@@ -1,0 +1,35 @@
+# Runtime secrets are supplied in Render, never committed here.
+services:
+  - type: web
+    name: plugg
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build:node
+    startCommand: npm start
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: STORAGE_PROVIDER
+        value: r2
+      - key: PLUGG_AUDIO_PROCESSING
+        value: manual
+      - key: PLUGG_SCHEDULER_ENABLED
+        value: 'false'
+      - key: DATABASE_URL
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET
+        value: plugg-private-media
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: PLUGG_ADMIN_ORIGINS
+        sync: false

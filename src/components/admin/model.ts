@@ -29,6 +29,7 @@ export interface AdminTrack {
   releaseDate: string;
   features: string | null;
   producers: string | null;
+  processingAvailable?: boolean;
   audioProcessingStatus: string;
   recordingType?: string | null;
   hasSamplesOrBeats?: boolean;
