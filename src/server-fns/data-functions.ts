@@ -244,11 +244,11 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
            COALESCE(technical_validation, '{}'::jsonb) as "technicalValidation",
            COALESCE(review_history, '[]'::jsonb) as "reviewHistory",
            COALESCE(uploader_role, 'owner') as "uploaderRole",
-           COALESCE(rights_declaration_accepted, false) as "rightsDeclarationAccepted",
+           (rights_declaration_text IS NOT NULL) as "rightsDeclarationAccepted",
            rights_declaration_text as "rightsDeclarationText",
            rights_declaration_version as "rightsDeclarationVersion",
            rights_declaration_timestamp as "rightsDeclarationTimestamp",
-           rights_declaration_user_id as "rightsDeclaredByUserId",
+           rights_declared_by_user_id as "rightsDeclaredByUserId",
            COALESCE(rights_hold, false) as "rightsHold",
            rights_hold_reason as "rightsHoldReason",
            rights_hold_placed_at as "rightsHoldPlacedAt",
@@ -958,8 +958,8 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         INSERT INTO releases (
           id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at,
           description, label, review_submitted_at, audio_processing_status, review_history, is_mock,
-          uploader_role, rights_declaration_accepted, rights_declaration_text, rights_declaration_version,
-          rights_declaration_timestamp, rights_declaration_user_id,
+          uploader_role, rights_declaration_text, rights_declaration_version,
+          rights_declaration_timestamp, rights_declared_by_user_id,
           rights_hold, rights_hold_reason, rights_hold_placed_at, rights_hold_placed_by
         )
         VALUES (
@@ -979,7 +979,6 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           ${JSON.stringify(reviewHistory)},
           false,
           ${release.uploaderRole || "owner"},
-          ${declarationAccepted},
           ${declarationText},
           ${declarationVersion},
           ${declarationAccepted ? sql`now()` : null},

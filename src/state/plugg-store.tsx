@@ -351,28 +351,28 @@ export function PluggProvider({
 }) {
   const { showAuthPrompt } = useAuthPrompt();
   const [artists, setArtists] = useState<Artist[]>(
-    initialData?.artists?.length ? initialData.artists : seedArtists,
+    initialData?.artists ?? [],
   );
   const [tracks, setTracks] = useState<Track[]>(
-    initialData?.tracks?.length ? initialData.tracks : seedTracks,
+    initialData?.tracks ?? [],
   );
   const [releases, setReleases] = useState<Release[]>(
-    initialData?.releases?.length ? initialData.releases : seedReleases,
+    initialData?.releases ?? [],
   );
   const [playlists, setPlaylists] = useState<Playlist[]>(
-    initialData?.playlists?.length ? initialData.playlists : seedPlaylists,
+    initialData?.playlists ?? [],
   );
   const genres = useMemo(
-    () => (initialData?.genres?.length ? initialData.genres : seedGenres),
+    () => (initialData?.genres ?? []),
     [initialData?.genres],
   );
 
   // Sync state if initialData is provided/updated
   useEffect(() => {
-    if (initialData?.artists?.length) setArtists(initialData.artists);
-    if (initialData?.tracks?.length) setTracks(initialData.tracks);
-    if (initialData?.releases?.length) setReleases(initialData.releases);
-    if (initialData?.playlists?.length) setPlaylists(initialData.playlists);
+    if (initialData?.artists) setArtists(initialData.artists);
+    if (initialData?.tracks) setTracks(initialData.tracks);
+    if (initialData?.releases) setReleases(initialData.releases);
+    if (initialData?.playlists) setPlaylists(initialData.playlists);
     if (initialData?.likedTrackIds) setLikedTrackIds(initialData.likedTrackIds);
     if (initialData?.followingArtistIds) setFollowingArtistIds(initialData.followingArtistIds);
     if (initialData?.user) {
