@@ -26,6 +26,7 @@ import { formatCount } from "@/lib/plugg";
 import { usePlugg } from "@/state/plugg-store";
 import { FullPlayer, MobilePlayerBar, PlayerBar } from "./player";
 import { Button } from "@/components/ui/button";
+import { VerifiedBadge } from "@/components/plugg/primitives";
 import { Home as GuestHome } from "@/routes/index";
 import { Discover as GuestDiscover } from "@/routes/discover";
 
@@ -111,7 +112,10 @@ function DiscoveryPanel() {
                 className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-border/30"
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold">{artist.displayName}</p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <p className="truncate text-[13px] font-semibold">{artist.displayName}</p>
+                  {artist.verified ? <VerifiedBadge size="xs" /> : null}
+                </div>
                 <p className="truncate text-xs text-muted-foreground">
                   {formatCount(artist.monthlyListeners)} monthly listeners
                 </p>

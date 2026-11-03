@@ -1,9 +1,22 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, Mic, Pencil, Trash2, Loader2 } from "lucide-react";
+import {
+  Check,
+  Mic,
+  Pencil,
+  Trash2,
+  Loader2,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  XCircle,
+  ShieldCheck,
+  ShieldAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, VerifiedBadge } from "@/components/plugg/primitives";
+import { ArtistVerificationModal } from "@/components/plugg/artist-verification-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,10 +78,33 @@ function Toggle({
 }
 
 export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } = {}) {
-  const { session, currentUser, currentArtist, signOut, deleteAccount, settings, updateSettings, networkQuality } = usePlugg();
+  const {
+    session,
+    currentUser,
+    currentArtist,
+    signOut,
+    deleteAccount,
+    settings,
+    updateSettings,
+    networkQuality,
+    verificationApplication,
+  } = usePlugg();
   const isArtist = session === "loggedInArtist" || currentUser?.accountType === "artist";
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+
+  const isVerified = Boolean(currentArtist?.verified || verificationApplication?.status === "approved");
+  const verificationStatus: "verified" | "pending" | "more_info_required" | "rejected" | "not_verified" =
+    isVerified
+      ? "verified"
+      : verificationApplication?.status === "pending"
+        ? "pending"
+        : verificationApplication?.status === "more_info_required"
+          ? "more_info_required"
+          : verificationApplication?.status === "rejected"
+            ? "rejected"
+            : "not_verified";
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
@@ -82,79 +118,147 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
 
   return (
     <div className="space-y-6">
-      <section className="surface-card p-5 sm:p-6">
+      {/* ── Refined Account Card ── */}
+      <section className="surface-card p-5 sm:p-6 space-y-5">
         <div className="flex items-center justify-between">
           <p className="text-eyebrow">Account</p>
-          {currentUser ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (onEditProfile) {
-                  onEditProfile();
-                } else {
-                  window.location.href = "/profile";
-                }
-              }}
-              className="inline-flex items-center gap-1.5 rounded-full bg-elevated/70 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-elevated hover:text-primary"
-              title="Edit profile"
-            >
-              <Pencil size={12} />
-              <span>Edit profile</span>
-            </button>
-          ) : null}
+          {isArtist && currentArtist && (
+            <span className="text-xs text-muted-foreground font-medium">
+              Artist Account
+            </span>
+          )}
         </div>
 
         {currentUser ? (
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center gap-4">
+          <div className="space-y-5">
+            {/* Top Identity: Stage Name vs Account Identity */}
+            <div className="flex items-start gap-4">
               <img
                 src={art(currentArtist?.avatarUrl ?? currentUser.avatarUrl)}
-                alt={currentUser.name}
+                alt={currentArtist?.displayName ?? currentUser.name}
                 className="h-14 w-14 rounded-full object-cover ring-2 ring-primary/20 shadow-md shrink-0"
               />
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <p className="text-base font-semibold text-foreground truncate">{currentUser.name}</p>
-                  {currentArtist?.verified ? (
-                    <span className="relative -top-0.5 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
-                      <VerifiedBadge size="sm" />
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
+              <div className="min-w-0 flex-1 space-y-1">
+                {isArtist && currentArtist ? (
+                  <>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-base font-semibold text-foreground truncate">
+                        {currentArtist.displayName}
+                      </p>
+                      {currentArtist.verified ? <VerifiedBadge size="sm" /> : null}
+                      <span className="text-xs text-muted-foreground font-normal">
+                        @{currentArtist.username}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <span>Account Identity:</span>
+                      <span className="font-medium text-foreground">{currentUser.name}</span>
+                      <span>•</span>
+                      <span className="truncate">{currentUser.email}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-base font-semibold text-foreground truncate">{currentUser.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{currentUser.email}</p>
+                  </>
+                )}
               </div>
             </div>
 
-            {isArtist ? (
-              <div className="rounded-xl bg-primary/5 p-4 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary capitalize">
-                    {currentArtist?.verified ? (
-                      <>
-                        <VerifiedBadge size="xs" />
-                        <span>Verified Plugg Artist</span>
-                      </>
-                    ) : (
-                      <>
-                        <Mic size={12} strokeWidth={2} />
-                        <span>Artist Account</span>
-                      </>
-                    )}
-                  </span>
+            {/* Information Hierarchy: Verification Status Box */}
+            {isArtist && currentArtist ? (
+              <div className="rounded-xl border border-border/60 bg-elevated/40 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Verification status
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {verificationStatus === "verified" && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400">
+                          <VerifiedBadge size="xs" />
+                          <span>Verified</span>
+                        </span>
+                      )}
+                      {verificationStatus === "pending" && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/15 border border-sky-500/30 px-3 py-1 text-xs font-semibold text-sky-400">
+                          <Clock className="h-3.5 w-3.5 animate-pulse" />
+                          <span>Under Review</span>
+                        </span>
+                      )}
+                      {verificationStatus === "more_info_required" && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-400">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          <span>More Information Required</span>
+                        </span>
+                      )}
+                      {verificationStatus === "rejected" && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 border border-rose-500/30 px-3 py-1 text-xs font-semibold text-rose-400">
+                          <XCircle className="h-3.5 w-3.5" />
+                          <span>Declined</span>
+                        </span>
+                      )}
+                      {verificationStatus === "not_verified" && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-elevated border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+                          <ShieldAlert className="h-3.5 w-3.5" />
+                          <span>Not Verified</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions according to status */}
+                  {verificationStatus === "not_verified" ? (
+                    <Button
+                      type="button"
+                      onClick={() => setShowVerificationModal(true)}
+                      className="h-8 px-4 rounded-full text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98] transition-all shrink-0 self-start sm:self-auto"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>Get Verified</span>
+                    </Button>
+                  ) : verificationStatus === "pending" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowVerificationModal(true)}
+                      className="h-8 px-3.5 rounded-full text-xs font-medium text-sky-400 hover:text-sky-300 border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 active:scale-[0.98] transition-all shrink-0 self-start sm:self-auto"
+                    >
+                      <span>View Application</span>
+                    </Button>
+                  ) : verificationStatus === "more_info_required" ? (
+                    <Button
+                      type="button"
+                      onClick={() => setShowVerificationModal(true)}
+                      className="h-8 px-4 rounded-full text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 active:scale-[0.98] transition-all shrink-0 self-start sm:self-auto"
+                    >
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      <span>Update Application</span>
+                    </Button>
+                  ) : verificationStatus === "rejected" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowVerificationModal(true)}
+                      className="h-8 px-3.5 rounded-full text-xs font-medium text-rose-400 hover:text-rose-300 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] transition-all shrink-0 self-start sm:self-auto"
+                    >
+                      <span>View Details & Re-apply</span>
+                    </Button>
+                  ) : null}
                 </div>
-                <p className="text-xs text-muted-foreground pt-1">
-                  {currentArtist?.verified
-                    ? "Your verified Plugg artist account is officially confirmed. Unlocks music uploads, your public artist profile, and real-time streaming analytics."
-                    : "Your artist account unlocks music uploads, your public artist profile, and real-time streaming analytics."}
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {verificationStatus === "verified"
+                    ? "Your artist identity is confirmed. The verified badge appears next to your stage name across Plugg."
+                    : verificationStatus === "pending"
+                      ? "Your verification request is currently under review by our administrative team. Duplicate applications are disabled while under review."
+                      : verificationStatus === "more_info_required"
+                        ? "Our review team requested additional verification details or streaming links before approving your badge."
+                        : verificationStatus === "rejected"
+                          ? "Your previous verification request was not approved. You can view the reviewer feedback and re-apply."
+                          : "Verify your artist profile for free to confirm your stage name and receive the official verified badge across Plugg."}
                 </p>
-                <div className="pt-2 flex gap-3">
-                  <Link
-                    to="/dashboard"
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                  >
-                    Go to Artist Dashboard →
-                  </Link>
-                </div>
               </div>
             ) : (
               <div className="rounded-xl bg-surface/50 p-4 space-y-1">
@@ -169,13 +273,31 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
               </div>
             )}
 
-            <div className="pt-2">
+            {/* Bottom Account Card Actions */}
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/40">
               <Button
+                type="button"
                 variant="outline"
-                className="px-4 py-1.5 text-xs text-destructive hover:bg-destructive/10 border-border hover:border-destructive/40 transition-colors"
+                className="h-9 px-4 rounded-full text-xs font-medium bg-elevated/70 text-foreground hover:bg-elevated hover:text-primary transition-all"
+                onClick={() => {
+                  if (onEditProfile) {
+                    onEditProfile();
+                  } else {
+                    window.location.href = "/profile";
+                  }
+                }}
+              >
+                <Pencil size={13} />
+                <span>Edit profile</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 px-4 rounded-full text-xs font-medium text-destructive/90 hover:text-destructive hover:bg-destructive/10 border-border hover:border-destructive/30 transition-all"
                 onClick={signOut}
               >
-                <span className="text-destructive font-medium">Sign out</span>
+                <span>Sign out</span>
               </Button>
             </div>
           </div>
@@ -192,6 +314,7 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
         )}
       </section>
 
+      {/* ── Playback Settings ── */}
       <section className="surface-card p-5 sm:p-6">
         <p className="text-eyebrow">Playback</p>
         <div className="mt-2 divide-y divide-border">
@@ -221,73 +344,66 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
             }}
           />
 
-          {/* Streaming Quality: Adaptive vs Data Saver */}
-          <div className="py-2 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Streaming audio quality</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {settings.streamingQuality === "data_saver"
-                  ? "Data Saver active (reduced data usage for metered connections)"
-                  : "Adaptive streaming (automatically optimizes playback quality)"}
-              </p>
+          {/* Streaming Audio Quality: Wide Two-Option Segmented Control */}
+          <div className="py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Streaming audio quality</p>
+                <p className="text-xs text-muted-foreground">
+                  Choose how Plugg delivers audio over your internet connection.
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2.5 shrink-0">
-              <span
-                className={cn(
-                  "text-xs font-medium cursor-pointer transition-colors",
-                  settings.streamingQuality !== "data_saver"
-                    ? "text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => {
-                  updateSettings({ streamingQuality: "auto" });
-                  toast.success("Streaming set to Adaptive");
-                }}
-              >
-                Adaptive
-              </span>
+
+            {/* Wider two-option segmented control aligned with settings content width */}
+            <div
+              role="radiogroup"
+              aria-label="Streaming audio quality"
+              className="grid grid-cols-2 gap-1 rounded-xl bg-elevated/80 p-1 border border-border/60"
+            >
               <button
                 type="button"
-                role="switch"
-                aria-checked={settings.streamingQuality === "data_saver"}
+                role="radio"
+                aria-checked={settings.streamingQuality !== "data_saver"}
                 onClick={() => {
-                  const isSaver = settings.streamingQuality === "data_saver";
-                  const next = isSaver ? "auto" : "data_saver";
-                  updateSettings({
-                    streamingQuality: next,
-                    highQualityStreaming: next === "auto",
-                  });
-                  toast.success(next === "data_saver" ? "Data Saver enabled" : "Adaptive streaming enabled");
+                  updateSettings({ streamingQuality: "auto", highQualityStreaming: true });
+                  toast.success("Streaming set to Adaptive");
                 }}
                 className={cn(
-                  "h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer",
-                  settings.streamingQuality === "data_saver" ? "bg-primary" : "bg-elevated"
+                  "flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all cursor-pointer",
+                  settings.streamingQuality !== "data_saver"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface/40",
                 )}
               >
-                <span
-                  className={cn(
-                    "block h-5 w-5 rounded-full transition-transform duration-200",
-                    settings.streamingQuality === "data_saver"
-                      ? "translate-x-5 bg-background shadow-xs"
-                      : "translate-x-0 bg-white shadow-xs"
-                  )}
-                />
+                <span>Adaptive</span>
               </button>
-              <span
-                className={cn(
-                  "text-xs font-medium cursor-pointer transition-colors",
-                  settings.streamingQuality === "data_saver"
-                    ? "text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
+
+              <button
+                type="button"
+                role="radio"
+                aria-checked={settings.streamingQuality === "data_saver"}
                 onClick={() => {
                   updateSettings({ streamingQuality: "data_saver", highQualityStreaming: false });
                   toast.success("Streaming set to Data Saver");
                 }}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all cursor-pointer",
+                  settings.streamingQuality === "data_saver"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface/40",
+                )}
               >
-                Data Saver
-              </span>
+                <span>Data Saver</span>
+              </button>
             </div>
+
+            {/* Dynamic Concise Explanation Directly Beneath Selector */}
+            <p className="text-xs text-muted-foreground leading-relaxed px-0.5">
+              {settings.streamingQuality === "data_saver"
+                ? "Data Saver compresses audio streams to minimize bandwidth, saving mobile data on metered connections."
+                : "Adaptive automatically balances playback resolution to match your connection speed for seamless, high-fidelity sound."}
+            </p>
           </div>
         </div>
       </section>
@@ -498,6 +614,11 @@ export function SettingsPanel({ onEditProfile }: { onEditProfile?: () => void } 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ArtistVerificationModal
+        open={showVerificationModal}
+        onOpenChange={setShowVerificationModal}
+      />
     </div>
   );
 }

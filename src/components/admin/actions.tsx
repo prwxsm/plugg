@@ -16,6 +16,7 @@ type Action =
   | "update_complaint"
   | "verify_artist"
   | "edit_artist"
+  | "review_verification"
   | "create_genre"
   | "edit_genre"
   | "delete_genre"
@@ -35,6 +36,7 @@ const labels: Record<Action, string> = {
   update_complaint: "Resolve / update complaint",
   verify_artist: "Set artist verification",
   edit_artist: "Edit artist metadata",
+  review_verification: "Review artist verification",
   create_genre: "Create genre",
   edit_genre: "Edit genre",
   delete_genre: "Delete unused genre",
@@ -44,11 +46,11 @@ const labels: Record<Action, string> = {
 };
 const pageActions: Record<string, Action[]> = {
   "Audio Processing": ["retry_audio"],
-  "Review Queue": ["approve", "request_changes", "place_rights_hold", "release_rights_hold"],
+  "Review Queue": ["approve", "request_changes", "place_rights_hold", "release_rights_hold", "review_verification"],
   "Scheduled Releases": ["reschedule", "place_rights_hold", "release_rights_hold"],
   "Music Catalog": ["takedown", "reinstate", "place_rights_hold", "release_rights_hold"],
   "Copyright & Complaints": ["record_complaint", "update_complaint", "place_rights_hold", "release_rights_hold"],
-  "Artist Directory": ["verify_artist", "edit_artist"],
+  "Artist Directory": ["verify_artist", "edit_artist", "review_verification"],
   "Genre Taxonomy": ["create_genre", "edit_genre", "delete_genre"],
   "Staff & Access": ["create_staff", "staff_role", "edit_staff"],
 };
@@ -84,6 +86,8 @@ export function AdminActions({
     [conflictNature, setConflictNature] = useState(""),
     [evidenceNotes, setEvidenceNotes] = useState(""),
     [resolutionNotes, setResolutionNotes] = useState(""),
+    [verificationDecision, setVerificationDecision] = useState<"approved" | "rejected" | "more_info_required">("approved"),
+    [verificationFeedback, setVerificationFeedback] = useState(""),
     [confirmed, setConfirmed] = useState(false),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -107,10 +111,15 @@ export function AdminActions({
     return null;
 
   const targets =
-    action === "retry_audio"
-      ? data.tracks
-          .filter((t) => t.audioProcessingStatus === "failed")
-          .map((t) => ({ id: t.id, label: t.title + " · " + t.artistName }))
+    action === "review_verification"
+      ? (data.verifications || []).map((v) => ({
+          id: v.id,
+          label: `${v.stageName} (${v.legalName}) · Status: ${v.status} · Links: ${v.supportingLinks?.length || 0}`,
+        }))
+      : action === "retry_audio"
+        ? data.tracks
+            .filter((t) => t.audioProcessingStatus === "failed")
+            .map((t) => ({ id: t.id, label: t.title + " · " + t.artistName }))
       : ["staff_role", "edit_staff"].includes(action || "")
         ? data.users
             .filter(
@@ -255,6 +264,10 @@ export function AdminActions({
           fields["password"] = password;
         }
         if (action === "verify_artist") fields["verified"] = verified;
+        if (action === "review_verification") {
+          fields["verificationStatus"] = verificationDecision;
+          fields["feedback"] = verificationFeedback || reason;
+        }
         if (action === "edit_artist") {
           fields["name"] = name;
           fields["location"] = location;
@@ -381,6 +394,33 @@ export function AdminActions({
                   />{" "}
                   Verified artist
                 </label>
+              </>
+            )}
+            {action === "review_verification" && (
+              <>
+                <label>
+                  Verification Decision
+                  <select
+                    value={verificationDecision}
+                    onChange={(e) => setVerificationDecision(e.target.value as any)}
+                  >
+                    <option value="approved">Approve & Verify (Grants verified badge)</option>
+                    <option value="more_info_required">Request More Information</option>
+                    <option value="rejected">Decline / Reject Application</option>
+                  </select>
+                </label>
+                {(verificationDecision === "more_info_required" || verificationDecision === "rejected") && (
+                  <label>
+                    Feedback / Reason for Artist *
+                    <textarea
+                      required
+                      rows={3}
+                      value={verificationFeedback}
+                      onChange={(e) => setVerificationFeedback(e.target.value)}
+                      placeholder="Specify what additional information, links, or documentation are required..."
+                    />
+                  </label>
+                )}
               </>
             )}
             {["staff_role", "create_staff", "edit_staff"].includes(action || "") && (

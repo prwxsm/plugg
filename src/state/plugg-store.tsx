@@ -15,7 +15,7 @@ import { genres as seedGenres } from "@/data/genres";
 import { playlists as seedPlaylists } from "@/data/playlists";
 import { releases as seedReleases } from "@/data/releases";
 import { tracks as seedTracks } from "@/data/tracks";
-import type { Analytics, Artist, Genre, Playlist, RecordingType, Release, Track, UploaderRole, User } from "@/data/types";
+import type { Analytics, Artist, ArtistVerificationApplication, Genre, Playlist, RecordingType, Release, Track, UploaderRole, User } from "@/data/types";
 import { goLiveAt, select, slugify } from "@/lib/plugg";
 import {
   toggleLikeTrackFn,
@@ -37,6 +37,7 @@ import {
   resubmitReleaseFn,
   retryTrackProcessingFn,
   replaceTrackAudioFn,
+  submitVerificationApplicationFn,
 } from "@/server-fns/data-functions";
 import { logoutUser, updateUserProfileFn, deleteUserAccountFn } from "@/server-fns/auth-functions";
 import { useAuthPrompt } from "@/components/plugg/auth-prompt-modal";
@@ -190,6 +191,7 @@ export interface InitialData {
   likedTrackIds?: string[];
   followingArtistIds?: string[];
   analytics?: Analytics;
+  verificationApplication?: ArtistVerificationApplication | null;
 }
 
 interface PluggContextValue {
@@ -242,6 +244,18 @@ interface PluggContextValue {
   uploadDraft: UploadDraft | null;
   saveUploadDraft: (draft: UploadDraft) => void;
   clearUploadDraft: () => void;
+  verificationApplication: ArtistVerificationApplication | null;
+  submitVerificationApplication: (data: {
+    legalName: string;
+    contactEmail: string;
+    contactPhone?: string | undefined;
+    country?: string | undefined;
+    city?: string | undefined;
+    primaryGenre?: string | undefined;
+    supportingLinks: string[];
+    note?: string | undefined;
+    accuracyConfirmed?: boolean | undefined;
+  }) => Promise<ArtistVerificationApplication>;
   // review workflow
   approveRelease: (releaseId: string, newReleaseDate?: string) => Promise<void>;
   requestChangesRelease: (releaseId: string, feedback: string) => Promise<void>;
@@ -382,6 +396,9 @@ export function PluggProvider({
       setDbUser(null);
       setSession("loggedOut");
     }
+    if (initialData?.verificationApplication !== undefined) {
+      setVerificationApplication(initialData.verificationApplication);
+    }
   }, [initialData]);
 
   const [dbUser, setDbUser] = useState<User | null>(initialData?.user ?? null);
@@ -391,6 +408,11 @@ export function PluggProvider({
     }
     return "loggedOut";
   });
+
+  const [verificationApplication, setVerificationApplication] =
+    useState<ArtistVerificationApplication | null>(
+      initialData?.verificationApplication ?? null,
+    );
 
   const [likedTrackIds, setLikedTrackIds] = useState<string[]>(initialData?.likedTrackIds ?? []);
   const [followingArtistIds, setFollowingArtistIds] = useState<string[]>(
@@ -473,11 +495,65 @@ export function PluggProvider({
     }
   }, []);
 
+  // Sync artist verification application status updates to user notifications
+  useEffect(() => {
+    if (!verificationApplication || verificationApplication.status === "pending") return;
+    const notifId = `verification-${verificationApplication.id}-${verificationApplication.status}`;
+    try {
+      const dismissed: string[] = JSON.parse(
+        window.localStorage.getItem("plugg:dismissed_notifs") || "[]",
+      );
+      if (Array.isArray(dismissed) && dismissed.includes(notifId)) return;
+    } catch {
+      /* ignore */
+    }
+
+    setAllNotifications((prev) => {
+      if (prev.some((n) => n.id === notifId)) return prev;
+      const newNotif: PluggNotification = {
+        id: notifId,
+        title:
+          verificationApplication.status === "approved"
+            ? "Artist Verification Approved"
+            : verificationApplication.status === "more_info_required"
+              ? "Verification: Action Required"
+              : "Artist Verification Declined",
+        description:
+          verificationApplication.status === "approved"
+            ? `Congratulations! Your artist profile "${verificationApplication.stageName}" is now officially verified on Plugg.`
+            : verificationApplication.adminFeedback
+              ? `Review feedback: "${verificationApplication.adminFeedback}"`
+              : verificationApplication.status === "more_info_required"
+                ? "The review team requested additional details or active streaming links for your application."
+                : "Your artist verification application was reviewed and not approved at this time.",
+        timestamp: "Recently",
+        targetUrl: "/profile?verify=1",
+        type: "system",
+      };
+      const updated = [newNotif, ...prev];
+      try {
+        window.localStorage.setItem("plugg:notifications", JSON.stringify(updated));
+      } catch {
+        /* ignore */
+      }
+      return updated;
+    });
+  }, [verificationApplication]);
+
   const clearNotification = useCallback((id: string) => {
     setAllNotifications((prev) => {
       const updated = prev.filter((n) => n.id !== id);
       try {
         window.localStorage.setItem("plugg:notifications", JSON.stringify(updated));
+        if (id.startsWith("verification-")) {
+          const dismissed: string[] = JSON.parse(
+            window.localStorage.getItem("plugg:dismissed_notifs") || "[]",
+          );
+          if (!dismissed.includes(id)) {
+            dismissed.push(id);
+            window.localStorage.setItem("plugg:dismissed_notifs", JSON.stringify(dismissed));
+          }
+        }
       } catch {
         /* ignore */
       }
@@ -1342,6 +1418,14 @@ export function PluggProvider({
     uploadDraft,
     saveUploadDraft: setUploadDraft,
     clearUploadDraft: () => setUploadDraft(null),
+    verificationApplication,
+    submitVerificationApplication: async (data) => {
+      const res = await submitVerificationApplicationFn({ data });
+      if (res?.application) {
+        setVerificationApplication(res.application);
+      }
+      return res.application;
+    },
     // review workflow
     approveRelease: async (releaseId: string, newReleaseDate?: string | undefined) => {
       try {

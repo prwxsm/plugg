@@ -100,6 +100,26 @@ export interface AdminComplaint {
   resolvedAt?: string | null;
   resolvedBy?: string | null;
 }
+export interface AdminVerificationApplication {
+  id: string;
+  artistId: string;
+  userId: string;
+  stageName: string;
+  legalName: string;
+  contactEmail: string;
+  contactPhone?: string | null;
+  country?: string | null;
+  city?: string | null;
+  primaryGenre?: string | null;
+  supportingLinks: string[];
+  note?: string | null;
+  status: "pending" | "more_info_required" | "approved" | "rejected";
+  adminFeedback?: string | null;
+  reviewedAt?: string | null;
+  reviewerId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface AdminArtist {
   id: string;
   displayName: string;
@@ -169,6 +189,7 @@ export interface AdminSnapshot {
   users: AdminUser[];
   plays: AdminPlay[];
   complaints: AdminComplaint[];
+  verifications: AdminVerificationApplication[];
   metrics: {
     releases: number;
     tracks: number;
@@ -177,6 +198,7 @@ export interface AdminSnapshot {
     verifiedArtists: number;
     adminUsers: number;
     pending: number;
+    pendingVerifications?: number;
     approaching: number;
     breached: number;
     missingSubmissionTime: number;

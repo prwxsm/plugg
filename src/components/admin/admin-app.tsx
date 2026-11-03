@@ -23,7 +23,7 @@ import {
   CalendarClock,
   ChartNoAxesCombined,
 } from "lucide-react";
-import { getAdminSnapshot } from "@/server-fns/admin-functions";
+import { getAdminSnapshot, performAdminOperation } from "@/server-fns/admin-functions";
 import { loginUser, logoutUser } from "@/server-fns/auth-functions";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -228,6 +228,40 @@ export function AdminApp() {
       match(`${u.name} ${u.username || ""} ${u.email} ${u.artistName || ""}`) &&
       (filter === "admin" ? u.isAdmin : filter === "all" || u.accountType === filter),
   );
+  const verifications = (data.verifications || []).filter((v) =>
+    match(`${v.stageName} ${v.legalName} ${v.contactEmail} ${v.primaryGenre || ""}`),
+  );
+
+  const handleReviewVerification = async (
+    targetId: string,
+    status: "approved" | "rejected" | "more_info_required",
+    feedbackPrompt?: string,
+  ) => {
+    let feedback = "";
+    if (status !== "approved") {
+      const input = window.prompt(feedbackPrompt || "Enter feedback for artist:");
+      if (!input || !input.trim()) return;
+      feedback = input.trim();
+    } else {
+      if (!window.confirm("Approve this artist's verification application and grant official verified badge?")) {
+        return;
+      }
+    }
+    try {
+      await performAdminOperation({
+        data: {
+          action: "review_verification",
+          targetId,
+          verificationStatus: status,
+          feedback,
+          confirmed: true,
+        },
+      });
+      await refresh();
+    } catch (err: any) {
+      alert(err?.message || "Operation failed");
+    }
+  };
   return (
     <div className="ad-app ad-real">
       <aside className={`ad-sidebar ${mobile ? "open" : ""}`}>
@@ -414,6 +448,11 @@ export function AdminApp() {
               <div className="ad-tabs">
                 {[
                   ["all", "All pending", m.pending],
+                  [
+                    "verifications",
+                    "Artist verifications",
+                    (data.verifications || []).filter((v) => v.status === "pending" || v.status === "more_info_required").length,
+                  ],
                   ["critical", "Critical SLA (≥18h)", m.approaching + m.breached],
                   [
                     "processing",
@@ -441,7 +480,98 @@ export function AdminApp() {
                 ))}
               </div>
               <div className="ad-review-list">
-                {reviews.map((r) => (
+                {filter === "verifications" && (
+                  <>
+                    {verifications.map((v) => (
+                      <section className="ad-panel ad-review" key={v.id}>
+                        <div className="ad-review-heading">
+                          <div style={{ flex: 1 }}>
+                            <div className="ad-tags" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <h2 style={{ margin: 0 }}>{v.stageName}</h2>
+                              <Pill tone={v.status === "approved" ? "green" : v.status === "pending" ? "blue" : v.status === "more_info_required" ? "amber" : "red"}>
+                                {v.status === "approved" ? "VERIFIED" : v.status === "pending" ? "PENDING REVIEW" : v.status === "more_info_required" ? "MORE INFO REQUIRED" : "DECLINED"}
+                              </Pill>
+                              {v.primaryGenre && <Pill>{v.primaryGenre}</Pill>}
+                            </div>
+                            <p style={{ marginTop: 6 }}>
+                              Legal Name: <strong>{v.legalName}</strong> · Contact: <a href={`mailto:${v.contactEmail}`} style={{ color: "var(--color-primary)" }}>{v.contactEmail}</a>
+                              {v.contactPhone ? ` · Tel: ${v.contactPhone}` : ""}
+                              {v.city || v.country ? ` · Location: ${[v.city, v.country].filter(Boolean).join(", ")}` : ""}
+                            </p>
+                            <small>
+                              Submitted: {kampala(v.createdAt)} EAT
+                              {v.reviewedAt ? ` · Last reviewed: ${kampala(v.reviewedAt)} EAT` : ""}
+                            </small>
+                          </div>
+                        </div>
+
+                        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border)" }}>
+                          <h4 style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                            Supporting Profiles & Links ({v.supportingLinks?.length || 0})
+                          </h4>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {(v.supportingLinks || []).map((link, idx) => (
+                              <a
+                                key={idx}
+                                href={link.startsWith("http") ? link : `https://${link}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ad-btn"
+                                style={{ fontSize: 12, padding: "4px 10px" }}
+                              >
+                                {link} ↗
+                              </a>
+                            ))}
+                          </div>
+
+                          {v.note && (
+                            <div style={{ marginTop: 10, fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "8px 12px", borderRadius: 8 }}>
+                              <strong>Artist Note:</strong> {v.note}
+                            </div>
+                          )}
+
+                          {v.adminFeedback && (
+                            <div style={{ marginTop: 8, fontSize: 13, color: "var(--color-amber)", background: "rgba(251,191,36,0.08)", padding: "8px 12px", borderRadius: 8 }}>
+                              <strong>Previous Admin Feedback:</strong> {v.adminFeedback}
+                            </div>
+                          )}
+                        </div>
+
+                        {data.currentUser.role !== "moderator" && (
+                          <div className="ad-review-footer" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button
+                              className="ad-btn"
+                              style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)" }}
+                              onClick={() => void handleReviewVerification(v.id, "approved")}
+                            >
+                              Approve & Grant Verified Badge
+                            </button>
+                            <button
+                              className="ad-btn"
+                              style={{ color: "#fbbf24", borderColor: "rgba(251,191,36,0.3)" }}
+                              onClick={() => void handleReviewVerification(v.id, "more_info_required", "Enter details or links required from the artist:")}
+                            >
+                              Request More Info
+                            </button>
+                            <button
+                              className="ad-btn"
+                              style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)" }}
+                              onClick={() => void handleReviewVerification(v.id, "rejected", "Enter reason for declining verification:")}
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        )}
+                      </section>
+                    ))}
+                    {!verifications.length && (
+                      <Empty title="No verification applications">
+                        There are currently no verification applications matching this search.
+                      </Empty>
+                    )}
+                  </>
+                )}
+                {filter !== "verifications" && reviews.map((r) => (
                   <section className="ad-panel ad-review" key={r.id}>
                     <div className="ad-review-heading">
                       <Artwork src={r.coverUrl} title={`${r.title} artwork`} className="ad-cover" />
@@ -552,7 +682,7 @@ export function AdminApp() {
                     </div>
                   </section>
                 ))}
-                {!reviews.length && (
+                {filter !== "verifications" && !reviews.length && (
                   <Empty title="No submissions in this view">
                     The database returned no matching review submissions.
                   </Empty>

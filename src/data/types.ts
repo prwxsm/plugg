@@ -209,3 +209,31 @@ export interface Analytics {
   recentPlays: { trackId: string; city: string; minutesAgo: number }[];
   releasePerformance: { releaseId: string; plays: number; saves: number }[];
 }
+
+export type VerificationStatus =
+  | "not_applied"
+  | "pending"
+  | "more_info_required"
+  | "approved"
+  | "rejected";
+
+export interface ArtistVerificationApplication {
+  id: string;
+  artistId: string;
+  userId: string;
+  stageName: string;
+  legalName: string;
+  contactEmail: string;
+  contactPhone?: string | undefined;
+  country?: string | undefined;
+  city?: string | undefined;
+  primaryGenre?: string | undefined;
+  supportingLinks: string[];
+  note?: string | undefined;
+  status: "pending" | "more_info_required" | "approved" | "rejected";
+  adminFeedback?: string | null | undefined;
+  reviewedAt?: string | null | undefined;
+  reviewerId?: string | null | undefined;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -11,6 +11,10 @@ import {
   MapPin,
   Music2,
   Globe,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  XCircle,
 } from "lucide-react";
 
 import {
@@ -25,6 +29,7 @@ import { SettingsPanel } from "@/components/plugg/settings-panel";
 import { ProfileImageUpload } from "@/components/plugg/profile-image-upload";
 import { ChangeEmailModal } from "@/components/plugg/change-email-modal";
 import { ChangePasswordModal } from "@/components/plugg/change-password-modal";
+import { ArtistVerificationModal } from "@/components/plugg/artist-verification-modal";
 import {
   SocialIconsList,
   InstagramIcon,
@@ -61,12 +66,31 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
-  const { currentUser, currentArtist, updateArtist, updateUser, playlists, followingArtistIds } = usePlugg();
+  const {
+    currentUser,
+    currentArtist,
+    updateArtist,
+    updateUser,
+    playlists,
+    followingArtistIds,
+    verificationApplication,
+  } = usePlugg();
   const [tab, setTab] = useState<"profile" | "settings">("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const search = window.location.search;
+      const hash = window.location.hash;
+      if (search.includes("verify") || hash.includes("verify")) {
+        setShowVerificationModal(true);
+      }
+    }
+  }, []);
 
   const userPlaylistsCount = playlists.filter((p) => p.userId === currentUser?.id).length;
   const followingCount = followingArtistIds.length;
@@ -300,13 +324,9 @@ function ProfilePage() {
         <p className="text-eyebrow">
           {currentArtist ? (currentArtist.verified ? "Verified Plugg Artist" : "Artist profile") : "Your account"}
         </p>
-        <h1 className="mt-1 inline-flex items-start gap-1.5 truncate text-2xl font-semibold sm:text-3xl">
+        <h1 className="mt-1 flex items-center gap-2 min-w-0 text-2xl font-semibold sm:text-3xl">
           <span className="truncate">{currentArtist ? currentArtist.displayName : currentUser.name}</span>
-          {currentArtist?.verified ? (
-            <span className="relative -top-0.5 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
-              <VerifiedBadge size="md" />
-            </span>
-          ) : null}
+          {currentArtist?.verified ? <VerifiedBadge size="md" /> : null}
         </h1>
       </div>
 
@@ -592,24 +612,72 @@ function ProfilePage() {
                     ) : null}
                   </div>
 
-                  {/* Actions: Edit Profile and View Public Page */}
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                  {/* Actions: Edit Profile, View Public Profile, and Subtle Verification Shortcut */}
+                  <div className="flex flex-wrap items-center gap-3 pt-1.5">
                     <Button
                       onClick={() => setIsEditing(true)}
-                      className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium shadow-xs"
+                      className="h-10 px-5 rounded-full inline-flex items-center justify-center gap-2 text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98] transition-all shadow-sm"
                     >
-                      <Pencil className="h-4 w-4" />
-                      Edit profile
+                      <Pencil className="h-4 w-4 shrink-0" />
+                      <span>Edit profile</span>
                     </Button>
 
                     <Link
                       to="/artist/$username"
                       params={{ username: currentArtist.username }}
-                      className="inline-flex items-center gap-2 rounded-full bg-elevated/70 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-elevated hover:text-primary"
+                      className="h-10 px-5 rounded-full inline-flex items-center justify-center gap-2 text-sm font-medium border border-border/80 bg-background/50 text-foreground hover:bg-elevated hover:text-primary active:scale-[0.98] transition-all"
                     >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      View public page
+                      <ExternalLink className="h-4 w-4 shrink-0" />
+                      <span>View public profile</span>
                     </Link>
+
+                    {/* Subtle Artist Verification Shortcut */}
+                    {currentArtist.verified ? (
+                      <span className="h-10 px-3.5 rounded-full inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                        <span>Verified Artist</span>
+                      </span>
+                    ) : verificationApplication?.status === "pending" ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowVerificationModal(true)}
+                        className="h-10 px-3.5 rounded-full inline-flex items-center gap-1.5 text-xs font-medium text-sky-400 bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                        title="Click to view application status"
+                      >
+                        <Clock className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+                        <span>Verification Under Review</span>
+                      </button>
+                    ) : verificationApplication?.status === "more_info_required" ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowVerificationModal(true)}
+                        className="h-10 px-3.5 rounded-full inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                        title="Click to provide requested info"
+                      >
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>Action Required • Verification</span>
+                      </button>
+                    ) : verificationApplication?.status === "rejected" ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowVerificationModal(true)}
+                        className="h-10 px-3.5 rounded-full inline-flex items-center gap-1.5 text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                        title="Click to view feedback and re-apply"
+                      >
+                        <XCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>Declined • Re-apply</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowVerificationModal(true)}
+                        className="h-10 px-4 rounded-full inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-elevated/40 hover:bg-elevated border border-border/50 active:scale-[0.98] transition-all cursor-pointer"
+                        title="Apply for official artist verification"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span>Get verified</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1074,6 +1142,11 @@ function ProfilePage() {
       <ChangePasswordModal
         open={showPasswordModal}
         onOpenChange={setShowPasswordModal}
+      />
+
+      <ArtistVerificationModal
+        open={showVerificationModal}
+        onOpenChange={setShowVerificationModal}
       />
     </div>
   );

@@ -54,15 +54,11 @@ function ArtistPage() {
           />
           <div className="min-w-0 flex-1">
             <p className="text-eyebrow">{artist.verified ? "Verified Plugg Artist" : "Artist"}</p>
-            <div className="mt-1 flex items-start">
-              <h1 className="inline-flex flex-wrap items-start gap-1.5 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                <span className="truncate">{artist.displayName}</span>
-                {artist.verified ? (
-                  <span className="relative -top-0.5 sm:-top-1 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
-                    <VerifiedBadge size="lg" />
-                  </span>
-                ) : null}
+            <div className="mt-1 flex items-center gap-2 min-w-0">
+              <h1 className="truncate text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                {artist.displayName}
               </h1>
+              {artist.verified ? <VerifiedBadge size="lg" /> : null}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatCount(artist.monthlyListeners)} monthly listeners
