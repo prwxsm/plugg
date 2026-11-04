@@ -1,3 +1,4 @@
+import { passwordError, PASSWORD_HELP } from "@/lib/password-policy";
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -15,7 +16,12 @@ import {
 import logo from "@/assets/logo.png";
 import { Button, Field, inputClass } from "@/components/plugg/primitives";
 import { cn } from "@/lib/utils";
-import { loginUser, registerUser } from "@/server-fns/auth-functions";
+import {
+  loginUser,
+  registerUser,
+  verifyRegistrationCode,
+  resendRegistrationCode,
+} from "@/server-fns/auth-functions";
 import { SUPPORTED_COUNTRIES } from "@/data/locations";
 import { genres } from "@/data/genres";
 import { CustomDropdown } from "@/components/plugg/custom-dropdown";
@@ -42,7 +48,12 @@ export const Route = createFileRoute("/auth")({
     const raw = search["returnTo"];
     const modeRaw = search["mode"];
     const result: AuthSearch = {};
-    if (typeof raw === "string" && raw.trim().length > 0) {
+    if (
+      typeof raw === "string" &&
+      raw.startsWith("/") &&
+      !raw.startsWith("//") &&
+      !/[\\\u0000-\u001f]/.test(raw)
+    ) {
       result.returnTo = raw;
     }
     if (modeRaw === "signin" || modeRaw === "signup") {
@@ -122,11 +133,12 @@ function AuthCardWrapper({
   );
 }
 
-
 function AuthPage() {
   const { returnTo, mode: searchMode } = useSearch({ from: "/auth" });
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">(searchMode === "signup" ? "signup" : "signin");
+  const [mode, setMode] = useState<"signin" | "signup">(
+    searchMode === "signup" ? "signup" : "signin",
+  );
   const [accountType, setAccountType] = useState<AccountType | null>(null);
 
   const handleClose = () => {
@@ -148,7 +160,6 @@ function AuthPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [returnTo]);
 
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -166,6 +177,17 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [verification, setVerification] = useState<{ id: string; email: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [resendAt, setResendAt] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  useEffect(() => {
+    if (!verification) return;
+    const tick = () => setSecondsLeft(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000)));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [verification, resendAt]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,8 +199,9 @@ function AuthPage() {
         setError("Passwords do not match. Please verify your password.");
         return;
       }
-      if (password.length < 6) {
-        setError("Password must be at least 6 characters long.");
+      const policyError = passwordError(password);
+      if (policyError) {
+        setError(policyError);
         return;
       }
       if (accountType === "artist") {
@@ -243,12 +266,11 @@ function AuthPage() {
           data: payload,
         });
         if (res.success) {
-          // Auto-login means we redirect immediately after registration
-          if (returnTo) {
-            window.location.href = returnTo;
-          } else {
-            window.location.href = res.role === "artist" ? "/dashboard" : "/";
-          }
+          setVerification({ id: res.id, email: res.email });
+          setResendAt(Date.now() + 60_000);
+          setPassword("");
+          setConfirmPassword("");
+          setLoading(false);
         }
       }
     } catch (err: any) {
@@ -274,6 +296,100 @@ function AuthPage() {
     setMode(newMode);
   };
 
+  if (verification) {
+    return (
+      <AuthCardWrapper onClose={handleClose} maxWidth="max-w-md">
+        <img src={logo} alt="Plugg" className="mx-auto h-9 w-9 object-contain" />
+        <h1 className="mt-6 text-xl font-semibold text-center">Verify your email</h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          We sent an 8-digit code to <strong>{verification.email}</strong>. It expires in 15
+          minutes. Your account will be created after verification.
+        </p>
+        <form
+          className="mt-6 space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setLoading(true);
+            setError(null);
+            try {
+              const res = await verifyRegistrationCode({ data: { id: verification.id, code } });
+              window.location.href = returnTo || (res.role === "artist" ? "/dashboard" : "/");
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Verification failed.");
+              setLoading(false);
+            }
+          }}
+        >
+          <Field label="Email verification code">
+            <input
+              className={inputClass}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{8}"
+              minLength={8}
+              maxLength={8}
+              required
+            />
+          </Field>
+          {error && (
+            <p role="alert" className="text-sm text-red-500">
+              {error}
+            </p>
+          )}
+          {successMessage && (
+            <p role="status" className="text-sm text-green-500">
+              {successMessage}
+            </p>
+          )}
+          <button
+            className="w-full rounded-full bg-primary text-primary-foreground py-3 disabled:opacity-50"
+            disabled={loading || code.length !== 8}
+          >
+            {loading ? "Verifying…" : "Verify and continue"}
+          </button>
+        </form>
+        <button
+          type="button"
+          className="mt-4 text-sm underline disabled:opacity-50"
+          disabled={loading || secondsLeft > 0}
+          onClick={async () => {
+            setLoading(true);
+            setError(null);
+            setSuccessMessage(null);
+            try {
+              const res = await resendRegistrationCode({ data: { id: verification.id } });
+              setVerification({ id: res.id, email: res.email });
+              setCode("");
+              setSuccessMessage("A new code has been sent. Use the most recent email.");
+              setResendAt(Date.now() + 60_000);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not resend the code.");
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          {secondsLeft > 0 ? `Resend in ${secondsLeft}s` : "Resend code"}
+        </button>
+        <button
+          type="button"
+          className="mt-4 ml-4 text-sm underline"
+          disabled={loading}
+          onClick={() => {
+            setVerification(null);
+            setCode("");
+            setError(null);
+            setSuccessMessage(null);
+          }}
+        >
+          Change email / restart
+        </button>
+      </AuthCardWrapper>
+    );
+  }
+
   // ── Sign-up: Account type selection step ──
   if (mode === "signup" && accountType === null) {
     return (
@@ -291,9 +407,7 @@ function AuthPage() {
             <img src={logo} alt="Plugg" className="h-10 w-10 object-contain" />
           </Link>
         </div>
-        <h1 className="mt-5 text-center text-xl font-semibold">
-          How will you use Plugg?
-        </h1>
+        <h1 className="mt-5 text-center text-xl font-semibold">How will you use Plugg?</h1>
         <p className="mt-2 text-center text-sm text-muted-foreground">
           Select your account type to get started.
         </p>
@@ -360,23 +474,23 @@ function AuthPage() {
         onClose={handleClose}
         maxWidth="max-w-md"
       >
-          <div className="flex justify-center">
-            <Link
-              to="/"
-              className="inline-block transition-transform hover:scale-105 active:scale-95"
-              title="Plugg home"
-            >
-              <img src={logo} alt="Plugg" className="h-10 w-10 object-contain" />
-            </Link>
-          </div>
-          <h1 className="mt-5 text-center text-xl font-semibold">
-            {mode === "signin"
-              ? "Welcome back"
-              : accountType === "artist"
-                ? "Create your artist account"
-                : "Create your listener account"}
-          </h1>
-          <p className="mt-2 text-center text-sm text-muted-foreground">
+        <div className="flex justify-center">
+          <Link
+            to="/"
+            className="inline-block transition-transform hover:scale-105 active:scale-95"
+            title="Plugg home"
+          >
+            <img src={logo} alt="Plugg" className="h-10 w-10 object-contain" />
+          </Link>
+        </div>
+        <h1 className="mt-5 text-center text-xl font-semibold">
+          {mode === "signin"
+            ? "Welcome back"
+            : accountType === "artist"
+              ? "Create your artist account"
+              : "Create your listener account"}
+        </h1>
+        <p className="mt-2 text-center text-sm text-muted-foreground">
           {mode === "signin"
             ? "Sign in with your email or username and password to access your library."
             : accountType === "artist"
@@ -436,7 +550,10 @@ function AuthPage() {
 
           {/* Artist Stage Name */}
           {mode === "signup" && accountType === "artist" ? (
-            <Field label="Artist / Stage name" hint="This is the name listeners will see on your songs.">
+            <Field
+              label="Artist / Stage name"
+              hint="This is the name listeners will see on your songs."
+            >
               <input
                 className={inputClass}
                 placeholder="e.g. Zuri Mwangi"
@@ -481,7 +598,7 @@ function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={mode === "signup" ? 15 : 1}
               />
               <button
                 type="button"
@@ -496,6 +613,7 @@ function AuthPage() {
             </div>
           </div>
 
+          {mode === "signup" && <p className="text-xs text-muted-foreground">{PASSWORD_HELP}</p>}
           {mode === "signup" ? (
             <Field label="Confirm password">
               <div className="relative">
@@ -506,7 +624,7 @@ function AuthPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={mode === "signup" ? 15 : 1}
                 />
                 <button
                   type="button"
@@ -538,7 +656,10 @@ function AuthPage() {
                 />
               </Field>
 
-              <Field label="Primary music genre" hint="Choose the primary genre that best defines your sound">
+              <Field
+                label="Primary music genre"
+                hint="Choose the primary genre that best defines your sound"
+              >
                 <CustomDropdown
                   value={primaryGenre}
                   onChange={setPrimaryGenre}
