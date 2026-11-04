@@ -46,10 +46,21 @@ const labels: Record<Action, string> = {
 };
 const pageActions: Record<string, Action[]> = {
   "Audio Processing": ["retry_audio"],
-  "Review Queue": ["approve", "request_changes", "place_rights_hold", "release_rights_hold", "review_verification"],
+  "Review Queue": [
+    "approve",
+    "request_changes",
+    "place_rights_hold",
+    "release_rights_hold",
+    "review_verification",
+  ],
   "Scheduled Releases": ["reschedule", "place_rights_hold", "release_rights_hold"],
   "Music Catalog": ["takedown", "reinstate", "place_rights_hold", "release_rights_hold"],
-  "Copyright & Complaints": ["record_complaint", "update_complaint", "place_rights_hold", "release_rights_hold"],
+  "Copyright & Complaints": [
+    "record_complaint",
+    "update_complaint",
+    "place_rights_hold",
+    "release_rights_hold",
+  ],
   "Artist Directory": ["verify_artist", "edit_artist", "review_verification"],
   "Genre Taxonomy": ["create_genre", "edit_genre", "delete_genre"],
   "Staff & Access": ["create_staff", "staff_role", "edit_staff"],
@@ -86,7 +97,9 @@ export function AdminActions({
     [conflictNature, setConflictNature] = useState(""),
     [evidenceNotes, setEvidenceNotes] = useState(""),
     [resolutionNotes, setResolutionNotes] = useState(""),
-    [verificationDecision, setVerificationDecision] = useState<"approved" | "rejected" | "more_info_required">("approved"),
+    [verificationDecision, setVerificationDecision] = useState<
+      "approved" | "rejected" | "more_info_required"
+    >("approved"),
     [verificationFeedback, setVerificationFeedback] = useState(""),
     [confirmed, setConfirmed] = useState(false),
     [busy, setBusy] = useState(false),
@@ -94,81 +107,100 @@ export function AdminActions({
 
   const isModerator = data.currentUser.role === "moderator";
   const rawAllowed = (pageActions[page] || []).filter(
-    (action) => action !== "retry_audio" || data.tracks.some((track) => track.processingAvailable !== false),
+    (action) =>
+      action !== "retry_audio" || data.tracks.some((track) => track.processingAvailable !== false),
   );
   // Moderators cannot execute final copyright takedowns/reinstatements/hold releases or staff actions
   const allowed = rawAllowed.filter(
     (a) =>
       !isModerator ||
-      !["takedown", "reinstate", "release_rights_hold", "update_complaint", "staff_role", "create_staff", "edit_staff"].includes(a),
+      ![
+        "review_verification",
+        "takedown",
+        "reinstate",
+        "release_rights_hold",
+        "update_complaint",
+        "staff_role",
+        "create_staff",
+        "edit_staff",
+      ].includes(a),
   );
 
   if (
     !allowed.length ||
-    (data.currentUser.role === "moderator" && !["Review Queue", "Copyright & Complaints"].includes(page)) ||
+    (data.currentUser.role === "moderator" &&
+      !["Review Queue", "Copyright & Complaints"].includes(page)) ||
     (page === "Staff & Access" && data.currentUser.role !== "super_admin")
   )
     return null;
 
   const targets =
     action === "review_verification"
-      ? (data.verifications || []).map((v) => ({
-          id: v.id,
-          label: `${v.stageName} (${v.legalName}) · Status: ${v.status} · Links: ${v.supportingLinks?.length || 0}`,
-        }))
+      ? (data.verifications || [])
+          .filter((v) => v.status === "pending")
+          .map((v) => ({
+            id: v.id,
+            label: `${v.stageName} (${v.legalName}) · Status: ${v.status} · Links: ${v.supportingLinks?.length || 0}`,
+          }))
       : action === "retry_audio"
         ? data.tracks
             .filter((t) => t.audioProcessingStatus === "failed")
             .map((t) => ({ id: t.id, label: t.title + " · " + t.artistName }))
-      : ["staff_role", "edit_staff"].includes(action || "")
-        ? data.users
-            .filter(
-              (u) =>
-                u.id !== data.currentUser.id &&
-                u.adminRole !== "super_admin" &&
-                (action !== "edit_staff" || ["admin", "moderator"].includes(u.adminRole || "")),
-            )
-            .map((u) => ({
-              id: u.id,
-              label: `${u.name} · ${u.email} · ${u.adminActive ? u.adminRole : "ordinary user"}`,
-            }))
-        : action === "update_complaint"
-          ? (data.complaints || []).map((c) => ({
-              id: c.id,
-              label: `${c.complaintReference} · ${c.complainantName} (${c.status})`,
-            }))
-          : action === "record_complaint"
-            ? [
-                { id: "general", label: "General complaint (no specific release)" },
-                ...data.releases.map((r) => ({
-                  id: r.id,
-                  label: `Release: ${r.title} · ${r.artistName}`,
-                })),
-              ]
-            : action === "release_rights_hold"
-              ? data.releases
-                  .filter((r) => r.rightsHold)
-                  .map((r) => ({
+        : ["staff_role", "edit_staff"].includes(action || "")
+          ? data.users
+              .filter(
+                (u) =>
+                  u.id !== data.currentUser.id &&
+                  u.adminRole !== "super_admin" &&
+                  (action !== "edit_staff" || ["admin", "moderator"].includes(u.adminRole || "")),
+              )
+              .map((u) => ({
+                id: u.id,
+                label: `${u.name} · ${u.email} · ${u.adminActive ? u.adminRole : "ordinary user"}`,
+              }))
+          : action === "update_complaint"
+            ? (data.complaints || []).map((c) => ({
+                id: c.id,
+                label: `${c.complaintReference} · ${c.complainantName} (${c.status})`,
+              }))
+            : action === "record_complaint"
+              ? [
+                  { id: "general", label: "General complaint (no specific release)" },
+                  ...data.releases.map((r) => ({
                     id: r.id,
-                    label: `${r.title} · ${r.artistName} (Hold: ${r.rightsHoldReason || "Active"})`,
-                  }))
-              : action === "place_rights_hold"
+                    label: `Release: ${r.title} · ${r.artistName}`,
+                  })),
+                ]
+              : action === "release_rights_hold"
                 ? data.releases
-                    .filter((r) => !r.rightsHold)
-                    .map((r) => ({ id: r.id, label: `${r.title} · ${r.artistName} · ${r.status}` }))
-                : action?.includes("artist")
-                  ? data.artists.map((a) => ({ id: a.id, label: a.displayName }))
-                  : action?.includes("genre")
-                    ? data.genres.map((g) => ({ id: g.id, label: g.name }))
-                    : data.releases
-                        .filter((r) =>
-                          action === "reschedule"
-                            ? r.status === "scheduled"
-                            : action === "approve" || action === "request_changes"
-                              ? r.status === "under_review"
-                              : true,
-                        )
-                        .map((r) => ({ id: r.id, label: `${r.title} · ${r.artistName} · ${r.status}` }));
+                    .filter((r) => r.rightsHold)
+                    .map((r) => ({
+                      id: r.id,
+                      label: `${r.title} · ${r.artistName} (Hold: ${r.rightsHoldReason || "Active"})`,
+                    }))
+                : action === "place_rights_hold"
+                  ? data.releases
+                      .filter((r) => !r.rightsHold)
+                      .map((r) => ({
+                        id: r.id,
+                        label: `${r.title} · ${r.artistName} · ${r.status}`,
+                      }))
+                  : action?.includes("artist")
+                    ? data.artists.map((a) => ({ id: a.id, label: a.displayName }))
+                    : action?.includes("genre")
+                      ? data.genres.map((g) => ({ id: g.id, label: g.name }))
+                      : data.releases
+                          .filter((r) =>
+                            action === "reschedule"
+                              ? r.status === "scheduled"
+                              : action === "approve" || action === "request_changes"
+                                ? r.status === "under_review"
+                                : true,
+                          )
+                          .map((r) => ({
+                            id: r.id,
+                            label: `${r.title} · ${r.artistName} · ${r.status}`,
+                          }));
 
   const open = (a: Action) => {
     setAction(a);
@@ -266,7 +298,7 @@ export function AdminActions({
         if (action === "verify_artist") fields["verified"] = verified;
         if (action === "review_verification") {
           fields["verificationStatus"] = verificationDecision;
-          fields["feedback"] = verificationFeedback || reason;
+          fields["feedback"] = verificationFeedback.trim();
         }
         if (action === "edit_artist") {
           fields["name"] = name;
@@ -409,7 +441,8 @@ export function AdminActions({
                     <option value="rejected">Decline / Reject Application</option>
                   </select>
                 </label>
-                {(verificationDecision === "more_info_required" || verificationDecision === "rejected") && (
+                {(verificationDecision === "more_info_required" ||
+                  verificationDecision === "rejected") && (
                   <label>
                     Feedback / Reason for Artist *
                     <textarea

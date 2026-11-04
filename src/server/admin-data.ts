@@ -193,7 +193,9 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
    v.note, v.status, v.admin_feedback, v.reviewed_at, v.reviewer_id,
    v.created_at, v.updated_at
   FROM artist_verification_applications v
-  ORDER BY v.created_at DESC LIMIT 500
+  JOIN artists a ON a.id=v.artist_id AND NOT a.is_mock
+  JOIN users u ON u.id=v.user_id AND NOT u.is_mock
+  ORDER BY (v.status = 'pending') DESC, v.updated_at ASC LIMIT 500
  `;
   const artistRows = await tx<Row[]>`
   SELECT id,display_name,username,avatar_url,location,city,country,primary_genre,phone_number,
@@ -253,7 +255,7 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
    ((SELECT count(*) FROM artists WHERE is_mock)+(SELECT count(*) FROM releases WHERE is_mock)+(SELECT count(*) FROM tracks WHERE is_mock)+(SELECT count(*) FROM users WHERE is_mock)+(SELECT count(*) FROM genres WHERE is_mock)) AS excluded_seed_records,
    (SELECT count(*) FROM real_releases WHERE rights_hold = true) AS rights_hold_count,
    (SELECT count(*) FROM copyright_complaints WHERE status IN ('received', 'under_investigation')) AS open_complaints,
-   (SELECT count(*) FROM artist_verification_applications WHERE status = 'pending') AS pending_verifications
+   (SELECT count(*) FROM artist_verification_applications v JOIN artists a ON a.id=v.artist_id JOIN users u ON u.id=v.user_id WHERE v.status = 'pending' AND NOT a.is_mock AND NOT u.is_mock) AS pending_verifications
  `;
   const daily = await tx<Row[]>`
   WITH days AS (SELECT generate_series((now() AT TIME ZONE 'Africa/Kampala')::date-6,(now() AT TIME ZONE 'Africa/Kampala')::date,interval '1 day')::date AS day),
@@ -419,7 +421,9 @@ async function readSnapshot(tx: TransactionSql): Promise<Omit<AdminSnapshot, "cu
       country: nullableText(v["country"]),
       city: nullableText(v["city"]),
       primaryGenre: nullableText(v["primaryGenre"]),
-      supportingLinks: Array.isArray(v["supportingLinks"]) ? (v["supportingLinks"] as string[]) : [],
+      supportingLinks: Array.isArray(v["supportingLinks"])
+        ? (v["supportingLinks"] as string[])
+        : [],
       note: nullableText(v["note"]),
       status: (v["status"] as any) || "pending",
       adminFeedback: nullableText(v["adminFeedback"]),

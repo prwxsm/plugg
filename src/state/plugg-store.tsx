@@ -498,7 +498,7 @@ export function PluggProvider({
   // Sync artist verification application status updates to user notifications
   useEffect(() => {
     if (!verificationApplication || verificationApplication.status === "pending") return;
-    const notifId = `verification-${verificationApplication.id}-${verificationApplication.status}`;
+    const notifId = `verification-${verificationApplication.id}-${verificationApplication.status}-${verificationApplication.reviewedAt || verificationApplication.updatedAt}`;
     try {
       const dismissed: string[] = JSON.parse(
         window.localStorage.getItem("plugg:dismissed_notifs") || "[]",

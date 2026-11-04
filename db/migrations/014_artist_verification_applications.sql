@@ -32,3 +32,7 @@ ALTER TABLE artist_verification_applications ALTER COLUMN note DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_artist_verification_artist ON artist_verification_applications(artist_id);
 CREATE INDEX IF NOT EXISTS idx_artist_verification_user ON artist_verification_applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_artist_verification_status ON artist_verification_applications(status);
+
+-- Guard concurrent or out-of-band submissions as well as application checks.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_artist_verification_pending_unique
+ON artist_verification_applications(artist_id) WHERE status = 'pending';

@@ -1,3 +1,4 @@
+import { reviewVerificationApplication } from "./artist-verification.ts";
 import sql from "../lib/db.ts";
 import { requirePermission, type AdminPermission } from "./admin-rbac.ts";
 import { futureMidnight } from "./admin-review.ts";
@@ -54,7 +55,9 @@ export const operationInput = z
       .transform((v) => v.toLowerCase())
       .optional(),
     initialPassword: z.string().min(12).max(72).optional(),
-    complaintStatus: z.enum(["received", "under_investigation", "resolved", "dismissed"]).optional(),
+    complaintStatus: z
+      .enum(["received", "under_investigation", "resolved", "dismissed"])
+      .optional(),
     complainantName: z.string().trim().max(200).optional(),
     complainantEmail: z.string().trim().email().max(254).optional(),
     conflictNature: z.string().trim().max(2000).optional(),
@@ -300,27 +303,14 @@ export async function administer(
       }
     } else if (data.action === "review_verification") {
       targetType = "artist_verification";
-      const [app] =
-        await tx`SELECT id,artist_id,status,legal_name,stage_name FROM artist_verification_applications WHERE id=${targetId} FOR UPDATE`;
-      if (!app) throw new Error("Verification application not found.");
-      if (!data.verificationStatus) throw new Error("Select an action for this application.");
-      const vStatus = data.verificationStatus;
-      if (
-        (vStatus === "rejected" || vStatus === "more_info_required") &&
-        !data.reason?.trim() &&
-        !data.feedback?.trim()
-      ) {
-        throw new Error("Provide feedback or reason for this decision.");
-      }
-      const feedback = data.feedback?.trim() || data.reason?.trim() || null;
-      before = { ...app };
-      await tx`UPDATE artist_verification_applications SET status=${vStatus},admin_feedback=${feedback},reviewed_at=now(),reviewer_id=${actor.id},updated_at=now() WHERE id=${targetId}`;
-      if (vStatus === "approved") {
-        await tx`UPDATE artists SET verified=true,updated_at=now() WHERE id=${app["artistId"]}`;
-      } else if (vStatus === "rejected") {
-        await tx`UPDATE artists SET verified=false,updated_at=now() WHERE id=${app["artistId"]}`;
-      }
-      after = { status: vStatus, adminFeedback: feedback, reviewedAt: new Date().toISOString() };
+      ({ before, after } = await reviewVerificationApplication(
+        tx,
+        targetId,
+        actor.id,
+        data.verificationStatus,
+        data.feedback,
+        data.reason,
+      ));
     } else {
       targetType = "genre";
       await tx`LOCK TABLE genres,tracks,artists IN SHARE ROW EXCLUSIVE MODE`;
