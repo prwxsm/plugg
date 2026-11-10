@@ -1,0 +1,278 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1080px;
+      height: 1920px;
+      background: #0d0e14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow: hidden;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #fafafa;
+      padding: 90px 60px 70px;
+    }
+
+    .telemetry-ambient-glow {
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 900px;
+      height: 900px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, rgba(22, 28, 44, 0.4) 45%, transparent 75%);
+      pointer-events: none;
+    }
+
+    /* Header */
+    .telemetry-header-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      z-index: 5;
+    }
+
+    .telemetry-pill-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fafafa;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .telemetry-headline-main {
+      font-size: 68px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      text-transform: uppercase;
+      color: #ffffff;
+      margin-bottom: 16px;
+    }
+
+    .telemetry-subhead {
+      font-size: 32px;
+      font-weight: 600;
+      color: #b0b8c8;
+      letter-spacing: 0.02em;
+    }
+
+    /* Stacked Cards */
+    .cards-stack {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      z-index: 5;
+    }
+
+    .telemetry-card {
+      width: 100%;
+      background: rgba(22, 24, 34, 0.92);
+      border: 1.5px solid rgba(255, 255, 255, 0.16);
+      border-radius: 36px;
+      padding: 38px 44px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 30px rgba(255, 255, 255, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .telemetry-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    }
+
+    .card-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .card-label-text {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #b0b8c8;
+    }
+
+    .card-badge-pill {
+      padding: 6px 16px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-size: 28px;
+      font-weight: 700;
+      color: #fafafa;
+    }
+
+    .card-badge-green {
+      background: rgba(74, 222, 128, 0.15);
+      border: 1px solid rgba(74, 222, 128, 0.4);
+      color: #4ade80;
+    }
+
+    .card-stat-big {
+      font-size: 96px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card-footer-sub {
+      font-size: 28px;
+      font-weight: 600;
+      color: #c0c6d6;
+    }
+
+    /* Bottom Callout */
+    .telemetry-bottom-callout {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 9999px;
+      padding: 20px 40px;
+      text-align: center;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #fafafa;
+      z-index: 5;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-telemetry" data-width="1080" data-height="1920">
+    <div id="telemetry-glow" class="clip telemetry-ambient-glow" data-start="0" data-duration="5.3"></div>
+
+    <!-- Header -->
+    <div id="telemetry-header-box" class="telemetry-header-section">
+      <div class="telemetry-pill-eyebrow" data-layout-ignore>
+        <span data-layout-ignore>INDEPENDENT CREATOR HUB</span>
+      </div>
+      <h1 class="telemetry-headline-main">
+        ZERO MIDDLEMEN.<br />DIRECT TO FANS.
+      </h1>
+      <p class="telemetry-subhead">
+        Upload from your mobile • Distribute to the world
+      </p>
+    </div>
+
+    <!-- Stacked Cards -->
+    <div class="cards-stack">
+      <!-- Card 1: Streams -->
+      <div id="stat-card-1" class="telemetry-card">
+        <div class="card-label-row">
+          <span class="card-label-text">TOTAL STREAMS</span>
+          <span class="card-badge-pill" data-layout-ignore>GLOBAL</span>
+        </div>
+        <div class="card-stat-big">8,420,330</div>
+        <p class="card-footer-sub">Uganda • Kenya • Tanzania • Diaspora</p>
+      </div>
+
+      <!-- Card 2: Listeners -->
+      <div id="stat-card-2" class="telemetry-card">
+        <div class="card-label-row">
+          <span class="card-label-text">MONTHLY LISTENERS</span>
+          <span class="card-badge-pill card-badge-green" data-layout-ignore>+36% GROWTH</span>
+        </div>
+        <div class="card-stat-big">312,480</div>
+        <p class="card-footer-sub">Active independent listeners</p>
+      </div>
+
+      <!-- Card 3: Verified Creator & Royalties -->
+      <div id="stat-card-3" class="telemetry-card">
+        <div class="card-label-row">
+          <span class="card-label-text">ARTIST STATUS</span>
+          <span class="card-badge-pill" data-layout-ignore>DIRECT PAYOUTS</span>
+        </div>
+        <div class="card-stat-big">VERIFIED CREATOR</div>
+        <p class="card-footer-sub">Direct royalties straight to mobile money</p>
+      </div>
+    </div>
+
+    <!-- Bottom Callout -->
+    <div id="telemetry-callout-pill" class="telemetry-bottom-callout" data-layout-ignore>
+      <span data-layout-ignore>STREAM. PUBLISH. OWN YOUR SOUND.</span>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tlTelem = gsap.timeline({ paused: true });
+
+    // Header box entrance
+    tlTelem.fromTo(
+      "#telemetry-header-box",
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+      0.1
+    );
+
+    // Card 1 drop: 1.0s local (= 10.2s film)
+    tlTelem.fromTo(
+      "#stat-card-1",
+      { opacity: 0, y: 60, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1.0, duration: 0.6, ease: "power3.out" },
+      1.0
+    );
+
+    // Card 2 drop: 2.0s local (= 11.2s film)
+    tlTelem.fromTo(
+      "#stat-card-2",
+      { opacity: 0, y: 60, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1.0, duration: 0.6, ease: "power3.out" },
+      2.0
+    );
+
+    // Card 3 drop: 3.0s local (= 12.2s film)
+    tlTelem.fromTo(
+      "#stat-card-3",
+      { opacity: 0, y: 60, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1.0, duration: 0.6, ease: "power3.out" },
+      3.0
+    );
+
+    // Bottom callout entrance
+    tlTelem.fromTo(
+      "#telemetry-callout-pill",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" },
+      3.4
+    );
+
+    // Outro transition on elements rather than #root
+    tlTelem.to(
+      ["#telemetry-header-box", ".cards-stack", "#telemetry-callout-pill"],
+      { opacity: 0, scale: 0.96, duration: 0.4, stagger: 0.05, ease: "power2.in" },
+      4.8
+    );
+
+    window.__timelines["scene-telemetry"] = tlTelem;
+    tlTelem.seek(0);
+  </script>
+</template>

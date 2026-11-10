@@ -2,13 +2,19 @@ import { Readable } from 'node:stream';
 import type { StorageProvider } from '../../lib/storage/types.ts';
 
 /** Serve bytes without buffering an entire song; HEAD never downloads the body. */
-export async function storedResponse(request: Request, key: string, storage: StorageProvider): Promise<Response> {
+export async function storedResponse(
+  request: Request,
+  key: string,
+  storage: StorageProvider,
+  options?: { cacheControl?: string | undefined },
+): Promise<Response> {
   const metadata = await storage.headFile(key);
   if (!metadata) return new Response('File not found', { status: 404 });
   const size = metadata.size;
+  const cacheControl = options?.cacheControl || 'private, no-store';
   const headers = new Headers({
     'Content-Type': metadata.mimeType, 'Content-Length': String(size), 'Accept-Ranges': 'bytes',
-    'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': cacheControl, 'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "sandbox; default-src 'none'",
   });
   const url = new URL(request.url);

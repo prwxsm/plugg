@@ -1,0 +1,281 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1080px;
+      height: 1920px;
+      background: #0d0e14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #fafafa;
+    }
+
+    .hook-glow {
+      position: absolute;
+      width: 960px;
+      height: 960px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(30, 36, 54, 0.45) 45%, transparent 75%);
+      pointer-events: none;
+    }
+
+    .phone-stage {
+      position: relative;
+      z-index: 2;
+      width: 860px;
+      height: 1540px;
+      background: #12141c;
+      border: 3px solid rgba(255, 255, 255, 0.22);
+      border-radius: 64px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 50px rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 40px 50px 60px;
+      overflow: hidden;
+    }
+
+    .phone-notch {
+      width: 180px;
+      height: 28px;
+      background: #000000;
+      border-radius: 9999px;
+      margin-bottom: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .hook-top-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    .hook-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 28px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fafafa;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 60px;
+    }
+
+    .hook-pill-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
+    }
+
+    .hook-titles-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .hook-line {
+      font-size: 84px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.08;
+      text-transform: uppercase;
+      color: #ffffff;
+      will-change: transform, opacity, filter;
+    }
+
+    .hook-line-sub {
+      color: #a0a5b5;
+    }
+
+    .hook-accent-line {
+      color: #ffffff;
+      text-shadow: 0 0 30px rgba(255, 255, 255, 0.4);
+    }
+
+    .hook-bottom-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .hook-tagline {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #c0c6d6;
+    }
+
+    /* Animated audio visualizer bars inside phone */
+    .bars-container {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 10px;
+      height: 120px;
+      width: 100%;
+      padding: 0 40px;
+    }
+
+    .v-bar {
+      flex: 1;
+      max-width: 22px;
+      background: #ffffff;
+      border-radius: 9999px;
+      height: 20px;
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.35);
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-hook" data-width="1080" data-height="1920">
+    <div id="hook-bg-glow" class="clip hook-glow" data-start="0" data-duration="4.2" data-layout-allow-overflow></div>
+
+    <div id="hook-phone" class="clip phone-stage" data-start="0" data-duration="4.2">
+      <div class="phone-notch"></div>
+
+      <div class="hook-top-section">
+        <div id="hook-pill-badge" class="hook-pill" data-layout-ignore>
+          <span class="hook-pill-dot"></span>
+          <span data-layout-ignore>EAST AFRICA • NEBBI • UGANDA</span>
+        </div>
+
+        <div class="hook-titles-box">
+          <h1 id="hook-line-1" class="hook-line">YOUR SOUND.</h1>
+          <h1 id="hook-line-2" class="hook-line hook-line-sub">YOUR STREAM.</h1>
+          <h1 id="hook-line-3" class="hook-line hook-accent-line">YOUR POCKET.</h1>
+        </div>
+      </div>
+
+      <div class="hook-bottom-section">
+        <div class="bars-container" id="hook-bars-box">
+          <div class="v-bar bar-1"></div>
+          <div class="v-bar bar-2"></div>
+          <div class="v-bar bar-3"></div>
+          <div class="v-bar bar-4"></div>
+          <div class="v-bar bar-5"></div>
+          <div class="v-bar bar-6"></div>
+          <div class="v-bar bar-7"></div>
+          <div class="v-bar bar-8"></div>
+          <div class="v-bar bar-9"></div>
+          <div class="v-bar bar-10"></div>
+          <div class="v-bar bar-11"></div>
+          <div class="v-bar bar-12"></div>
+          <div class="v-bar bar-13"></div>
+          <div class="v-bar bar-14"></div>
+        </div>
+
+        <p id="hook-subtitle" class="hook-tagline">
+          THE MODERN INDEPENDENT PLAYER
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tlHook = gsap.timeline({ paused: true });
+
+    // Ambient glow breathe
+    tlHook.fromTo(
+      "#hook-bg-glow",
+      { opacity: 0.4, scale: 0.9 },
+      { opacity: 1, scale: 1.1, duration: 2.5, ease: "power2.out" },
+      0
+    );
+
+    // Smartphone chassis entrance - visible at frame 0
+    tlHook.fromTo(
+      "#hook-phone",
+      { opacity: 1, scale: 0.96, y: 15 },
+      { opacity: 1, scale: 1.0, y: 0, duration: 0.7, ease: "power3.out" },
+      0
+    );
+
+    // Pill badge - visible at frame 0
+    tlHook.fromTo(
+      "#hook-pill-badge",
+      { opacity: 0.9, y: 0 },
+      { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" },
+      0
+    );
+
+    // Line 1: YOUR SOUND. (settled and readable right from frame 0)
+    tlHook.fromTo(
+      "#hook-line-1",
+      { opacity: 0.95, y: 10, filter: "blur(0px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.4, ease: "power4.out" },
+      0
+    );
+
+    // Line 2: YOUR STREAM.
+    tlHook.fromTo(
+      "#hook-line-2",
+      { opacity: 0, y: 35, filter: "blur(6px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" },
+      1.1
+    );
+
+    // Line 3: YOUR POCKET.
+    tlHook.fromTo(
+      "#hook-line-3",
+      { opacity: 0, y: 35, filter: "blur(6px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" },
+      1.9
+    );
+
+    // Subtitle tagline
+    tlHook.fromTo(
+      "#hook-subtitle",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+      2.4
+    );
+
+    // Audio Equalizer bars animation
+    const heights = [60, 100, 45, 90, 115, 75, 110, 85, 100, 50, 115, 80, 65, 95];
+    const bars = document.querySelectorAll(".v-bar");
+    bars.forEach((b, i) => {
+      tlHook.fromTo(
+        b,
+        { height: 16 },
+        {
+          height: heights[i % heights.length],
+          duration: 0.5,
+          repeat: 6,
+          yoyo: true,
+          ease: "power1.inOut"
+        },
+        0.3 + (i * 0.05)
+      );
+    });
+
+    // Match-cut camera push into phone screen
+    tlHook.to(
+      "#hook-phone",
+      { scale: 1.35, opacity: 0, duration: 0.4, ease: "power3.in" },
+      3.8
+    );
+
+    window.__timelines["scene-hook"] = tlHook;
+    tlHook.seek(0);
+  </script>
+</template>

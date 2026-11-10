@@ -1,8 +1,7 @@
-import { canReadAudio, isStoredAudio } from "../media-access";
+import { canReadAudio, canReadStoredFile, isPublicStoredImage, isStoredAudio } from "../media-access";
 import { getStorageProvider } from "../../lib/storage";
 import { validateStorageKey } from "../../lib/storage/media-key";
 import { storedResponse } from "./stored-response";
-import { canReadStoredFile } from "../media-access";
 
 export async function handleFileRequest(request: Request, key: string): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -22,7 +21,15 @@ export async function handleFileRequest(request: Request, key: string): Promise<
   if (audioAsset && !(await canReadAudio(request, decodedKey)))
     return new Response("Media unavailable", { status: 404 });
   try { validateStorageKey(decodedKey); } catch { return new Response("Forbidden", { status: 403 }); }
-  if (!audioAsset && !(await canReadStoredFile(request, decodedKey)))
+  const publicImage = !audioAsset && (await isPublicStoredImage(decodedKey));
+  if (!audioAsset && !publicImage && !(await canReadStoredFile(request, decodedKey)))
     return new Response("Media unavailable", { status: 404 });
-  return storedResponse(request, decodedKey, getStorageProvider());
+  return storedResponse(
+    request,
+    decodedKey,
+    getStorageProvider(),
+    publicImage
+      ? { cacheControl: "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400" }
+      : undefined,
+  );
 }

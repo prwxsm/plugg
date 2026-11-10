@@ -5,33 +5,29 @@ import { useState } from "react";
 import { PlayButton, Rail, ReleaseCard, TrackRow } from "@/components/plugg/media";
 import { Button, SectionHeader } from "@/components/plugg/primitives";
 import { AddToPlaylistButton } from "@/components/plugg/add-to-playlist-button";
-import { artists as seedArtists } from "@/data/artists";
 import { art } from "@/data/covers";
-import { releases as seedReleases } from "@/data/releases";
+import { buildReleaseHeadMeta, DEFAULT_PUBLIC_ORIGIN } from "@/lib/og-meta";
 import { formatDate, formatDuration } from "@/lib/plugg";
+import { getReleaseShareData } from "@/server-fns/data-functions";
 import { usePlugg } from "@/state/plugg-store";
 
 export const Route = createFileRoute("/release/$slug")({
-  head: ({ params }) => {
-    const release = seedReleases.find((r) => r.slug === params.slug);
-    const artist = seedArtists.find((a) => a.id === release?.artistId);
-    const title = release ? `${release.title} — ${artist?.displayName ?? "Plugg"}` : "Release — Plugg";
-    const description = release
-      ? `Listen to ${release.title}, a ${release.type} by ${artist?.displayName ?? "artist"} on Plugg.`
-      : "Listen to African music on Plugg.";
-    return {
-      meta: [
-        { title },
-        { name: "description", content: description },
-        { property: "og:title", content: title },
-        { property: "og:description", content: description },
-      ],
-    };
+  loader: async ({ params }) => {
+    const data = await getReleaseShareData({ data: params.slug });
+    if (!data) throw notFound();
+    return data;
+  },
+  head: ({ loaderData, params }) => {
+    const origin =
+      loaderData?.origin ||
+      (typeof window !== "undefined" ? window.location.origin : DEFAULT_PUBLIC_ORIGIN);
+    return buildReleaseHeadMeta(loaderData, params.slug, origin);
   },
   component: ReleasePage,
 });
 
 function ReleasePage() {
+  const loaderData = Route.useLoaderData();
   const { slug } = Route.useParams();
   const {
     releases,
@@ -45,7 +41,7 @@ function ReleasePage() {
     toggleLike,
   } = usePlugg();
 
-  const release = releases.find((r) => r.slug === slug);
+  const release = releases.find((r) => r.id === loaderData.id || r.slug === slug);
   if (!release) throw notFound();
 
   const artist = artists.find((a) => a.id === release.artistId);

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { ArrowRight, Bell, Headphones, Music2, TrendingUp, X, RotateCcw } from "lucide-react";
+import { ArrowRight, Bell, Headphones, Music2, TrendingUp, X, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
 
 import { Button, EmptyState } from "@/components/plugg/primitives";
 import { usePlugg } from "@/state/plugg-store";
@@ -31,6 +31,10 @@ function getNotificationIcon(type: string) {
       return Headphones;
     case "milestone":
       return TrendingUp;
+    case "verification":
+      return ShieldCheck;
+    case "alert":
+      return AlertCircle;
     default:
       return Bell;
   }
@@ -189,10 +193,10 @@ function UpdatesPage() {
             <button
               type="button"
               onClick={restoreDefaultNotifications}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors cursor-pointer"
             >
-              <RotateCcw size={13} />
-              Restore sample updates
+              <RefreshCw size={13} />
+              Check for new updates
             </button>
           </div>
         </div>
