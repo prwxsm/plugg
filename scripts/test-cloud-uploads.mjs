@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { inspectUpload, boundedUploadBody, REQUEST_UPLOAD_LIMIT } from '../src/server/upload-policy.ts';
+import { inspectUpload, boundedUploadBody, REQUEST_UPLOAD_LIMIT, uploadOriginAllowed } from '../src/server/upload-policy.ts';
 import { handleUploadRequest } from '../src/server/api/upload.ts';
 import { ownedUpload } from '../src/server/upload-reference.ts';
 import sql from '../src/lib/db.ts';
@@ -10,6 +10,12 @@ assert.throws(()=>inspectUpload('../cover',png),/category/);
 assert.throws(()=>inspectUpload('audio',png),/audio|format/i);
 assert.throws(()=>inspectUpload('cover',Buffer.from('<svg>bad</svg>')),/PNG/);
 await assert.rejects(boundedUploadBody(new Request('https://plugg.test/api/upload',{method:'POST',headers:{'content-length':String(REQUEST_UPLOAD_LIMIT+1)},body:'x'})),/50 MB/);
+
+const oldNodeEnv=process.env.NODE_ENV;
+process.env.NODE_ENV='production';
+assert.equal(uploadOriginAllowed(new Request('http://localhost:10000/api/upload',{headers:{origin:'https://plugg.site'}})),true);
+assert.equal(uploadOriginAllowed(new Request('http://localhost:10000/api/upload',{headers:{origin:'https://evil.test','x-forwarded-host':'evil.test'}})),false);
+if(oldNodeEnv===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=oldNodeEnv;
 const stop = new Error('rollback');
 process.env.STORAGE_PROVIDER='r2';process.env.PLUGG_AUDIO_PROCESSING='manual';
 try {
