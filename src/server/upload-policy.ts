@@ -46,3 +46,11 @@ export function inspectUpload(category: string, bytes: Uint8Array) {
     return { extension: 'webp', mimeType: 'image/webp', validation: null };
   throw new UploadError('Choose a PNG, JPEG, or WebP image.');
 }
+
+/** Render terminates TLS before Node; use a configured public origin, never forwarded headers. */
+export function uploadOriginAllowed(request: Request): boolean {
+  const expected = process.env["NODE_ENV"] === "production"
+    ? (process.env["PLUGG_PUBLIC_ORIGIN"] || "https://plugg.site")
+    : new URL(request.url).origin;
+  return request.headers.get("origin") === expected;
+}

@@ -2,15 +2,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import defaultSql from '../../lib/db.ts';
 import { getStorageProvider } from '../../lib/storage/index.ts';
 import { localAudioProcessingEnabled } from '../processing-mode.ts';
-import { boundedUploadBody, inspectUpload, UploadError } from '../upload-policy.ts';
+import { boundedUploadBody, inspectUpload, UploadError, uploadOriginAllowed } from '../upload-policy.ts';
 
 // Keep multipart buffering bounded on the small free instance.
 let activeUploads = 0;
 export async function handleUploadRequest(request: Request, sql = defaultSql, storage = getStorageProvider()): Promise<Response> {
   const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
   if (request.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
-  const origin = request.headers.get('origin');
-  if (origin !== new URL(request.url).origin) return reply({ error: 'Upload from the Plugg website.' }, 403);
+  if (!uploadOriginAllowed(request)) return reply({ error: 'Upload from the Plugg website.' }, 403);
   const session = request.headers.get('cookie')?.split(';').map(v => v.trim()).find(v => v.startsWith('plugg_session='))?.slice(14);
   if (!session) return reply({ error: 'Sign in before uploading.' }, 401);
   const [user] = await sql`SELECT u.id,u.artist_id,u.account_type FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=${session} AND s.expires_at>now()`;
