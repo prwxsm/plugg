@@ -688,6 +688,7 @@ function UploadPage() {
   const [isValidatingAudio, setIsValidatingAudio] = useState<Record<number, boolean>>({});
 
   const handleAudioFileSelect = async (index: number, file: File) => {
+    if (file.size > 50 * 1024 * 1024) { toast.error("Audio must be 50 MB or smaller. Use FLAC for a smaller lossless file."); return; }
     setIsValidatingAudio((prev) => ({ ...prev, [index]: true }));
     try {
       const realSec = await getAudioDuration(file);
@@ -1109,6 +1110,7 @@ function UploadPage() {
   };
 
   const handleCoverSelect = (file: File) => {
+    if (file.size > 5 * 1024 * 1024) { toast.error("Cover artwork must be 5 MB or smaller."); return; }
     setCoverFile(file);
     const previewUrl = URL.createObjectURL(file);
     setCoverPreview(previewUrl);
@@ -1161,11 +1163,12 @@ function UploadPage() {
 
           const res = await fetch("/api/upload", { method: "POST", body: fd });
           const data = await res.json();
-          if (data.url) {
-            finalCoverKey = data.url;
-          }
+          if (!res.ok || !data.url) throw new Error(data.error || "Cover upload failed");
+          finalCoverKey = data.url;
+          setCoverKey(data.url);
+          setCoverFile(null);
         } catch (coverErr) {
-          console.warn("Cover file upload to server failed, proceeding:", coverErr);
+          throw coverErr;
         }
       }
 
@@ -1192,6 +1195,8 @@ function UploadPage() {
             if (targetSong && data.url) {
               targetSong.audioUrl = data.url;
               if (data.fileHash) targetSong.fileHash = data.fileHash;
+              patchSong(idx, { audioUrl: data.url, fileHash: data.fileHash });
+              rawAudioFiles.current.delete(idx);
             }
             if (data.duplicateInfo?.isDuplicate) {
               if (data.duplicateInfo.matchType === "same_artist") {
@@ -1214,8 +1219,8 @@ function UploadPage() {
       }
 
       setUploadPercent(95);
-      setUploadStatusText("Processing audio and creating release…");
-      await createRelease({
+      setUploadStatusText("Submitting release…");
+      const submitted = await createRelease({
         title:
           title.trim() ||
           (isSingle ? songs[0]?.title.trim() || "Untitled single" : "Untitled release"),
@@ -1231,11 +1236,12 @@ function UploadPage() {
       });
 
       setUploadPercent(100);
-      setUploadStatusText("Under Review");
+      setUploadStatusText(submitted.status === "processing" ? "Awaiting processing" : "Submitted for review");
       window.setTimeout(() => navigate({ to: "/dashboard", search: { tab: "releases" } }), 400);
     } catch (err) {
       console.error("Failed to complete release:", err);
-      setUploadStatusText("Processing failed");
+      setUploadStatusText("Submission failed");
+      toast.error(err instanceof Error ? err.message : "Submission failed. Please retry.");
       setUploadPercent(null);
     }
   };
@@ -1245,6 +1251,10 @@ function UploadPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8 pt-14 md:pt-0">
       <ArtistMobileTabs />
+      <div className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground" role="note">
+        Upload audio up to 50 MB per track and artwork up to 5 MB. Our team processes and reviews
+        each release before publication. Your selected date is a requested date, not a publication guarantee.
+      </div>
       <div className="flex items-center justify-between gap-3 mt-4">
         {step > 0 ? (
           <button
@@ -1914,7 +1924,7 @@ function UploadPage() {
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <Clock size={16} />
               </span>
-              <p className="font-semibold text-foreground">Goes live {formatDateTime(goLive)}</p>
+              <p className="font-semibold text-foreground">Requested release: {formatDateTime(goLive)}</p>
             </div>
 
             <div className="rounded-xl bg-elevated/30 p-4 text-sm space-y-3">
@@ -2035,7 +2045,7 @@ function UploadPage() {
           </Button>
         ) : (
           <Button disabled={!canContinue || uploadPercent !== null} onClick={handleSubmit}>
-            {uploadPercent !== null ? uploadStatusText : "Schedule release"}
+            {uploadPercent !== null ? uploadStatusText : "Submit for processing and review"}
           </Button>
         )}
       </div>

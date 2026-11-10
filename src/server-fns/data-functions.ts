@@ -887,9 +887,19 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
 
     const { release, songs } = data;
 
+    if (!release || !Array.isArray(songs) || songs.length < 1 || songs.length > 30 ||
+        typeof release.title !== "string" || !release.title.trim() || release.title.length > 200 ||
+        !["single", "EP", "album"].includes(release.type) ||
+        songs.some(song => typeof song.title !== "string" || !song.title.trim() || song.title.length > 200)) {
+      throw new Error("Provide a release title and between 1 and 30 named tracks.");
+    }
+    const { ownedUpload } = await import("@/server/upload-reference");
+    const provider = process.env["STORAGE_PROVIDER"] || "local";
+    if (release.status !== "draft") await ownedUpload(sql, release.coverUrl, user.id, "cover", provider);
+
     // Validate mandatory copyright declaration for non-draft submissions
     const isDraft = release.status === "draft";
-    if (!isDraft && !release.rightsDeclarationAccepted) {
+    if (!isDraft && release.rightsDeclarationAccepted !== true) {
       throw new Error(
         "Mandatory copyright declaration must be confirmed before submitting for review.",
       );
@@ -944,17 +954,12 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     }[] = [];
 
     for (const song of songs) {
-      // 1. Resolve SHA-256 hash
-      let hash = song.fileHash || null;
-      if (!hash && song.audioUrl) {
-        const cleanKey = decodeURIComponent(
-          song.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, ""),
-        );
-        const [fileRow] = await sql<{ file_hash: string | null }[]>`
-          SELECT file_hash FROM files WHERE storage_key = ${cleanKey} LIMIT 1
-        `;
-        if (fileRow?.file_hash) hash = fileRow.file_hash;
-      }
+      // Never trust a submitted hash or another artist's storage URL.
+      const uploaded = song.audioUrl
+        ? await ownedUpload(sql, song.audioUrl, user.id, "audio", provider)
+        : null;
+      if (!isDraft && !uploaded) throw new Error("Upload audio for every track before submitting.");
+      const hash = uploaded?.fileHash || null;
 
       // 2. Validate and normalize ISRC if supplied
       let normIsrc: string | null = null;
@@ -1315,6 +1320,23 @@ export const replaceTrackAudioFn = createServerFn({ method: "POST" })
     }
 
     const { trackId, audioUrl } = data;
+
+    if (process.env["STORAGE_PROVIDER"] === "r2") {
+      const { ownedUpload } = await import("@/server/upload-reference");
+      const file = await ownedUpload(sql, audioUrl, user.id, "audio", "r2");
+      return sql.begin(async tx => {
+        const [target] = await tx`SELECT r.id,r.status FROM releases r JOIN tracks t ON t.release_id=r.id WHERE t.id=${trackId} AND t.artist_id=${user.artistId!} FOR UPDATE OF r`;
+        if (!target || !["changes_required", "draft", "under_review"].includes(target["status"])) throw new Error("Replacement requires a draft or release awaiting review/corrections.");
+        await tx`SELECT id FROM tracks WHERE id=${trackId} FOR UPDATE`;
+        await tx`UPDATE tracks SET audio_url=${audioUrl},file_hash=${file.fileHash},audio_variants='{}',technical_validation='{}',audio_processing_status='pending',published=false,updated_at=now() WHERE id=${trackId}`;
+        await tx`UPDATE releases SET status='processing',audio_processing_status='pending',reviewer_id=NULL,updated_at=now() WHERE id=${target["id"]}`;
+        await tx`UPDATE tracks SET published=false WHERE release_id=${target["id"]}`;
+        const [duplicate] = await tx`SELECT id FROM tracks WHERE file_hash=${file.fileHash} AND artist_id<>${user.artistId!} LIMIT 1`;
+        if (duplicate) await tx`UPDATE releases SET rights_hold=true,rights_hold_reason='Replacement recording matches another artist. Staff rights review required.',rights_hold_placed_at=now(),rights_hold_placed_by='system' WHERE id=${target["id"]}`;
+
+        return { success: true, trackId, pending: true, variants: {}, technicalValidation: {} };
+      });
+    }
 
     // Verify track ownership and allowed replacement state
     const [track] = await sql<

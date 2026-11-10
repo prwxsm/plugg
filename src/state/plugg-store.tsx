@@ -18,6 +18,7 @@ import { tracks as seedTracks } from "@/data/tracks";
 import type { Analytics, Artist, ArtistVerificationApplication, Genre, Playlist, RecordingType, Release, Track, UploaderRole, User } from "@/data/types";
 import { goLiveAt, select, slugify } from "@/lib/plugg";
 import {
+  getInitialData,
   toggleLikeTrackFn,
   toggleFollowArtistFn,
   createPlaylistFn,
@@ -1358,12 +1359,9 @@ export function PluggProvider({
         rightsDeclarationVersion: input.rightsDeclarationAccepted ? "2026-10-31.1" : undefined,
       };
 
-      setTracks((prev) => [...newTracks, ...prev]);
-      setReleases((prev) => [release, ...prev]);
-      setUploadDraft(null);
 
       // Persist to database
-      createReleaseWithTracksFn({
+      const saved = await createReleaseWithTracksFn({
         data: {
           release: {
             title: input.title,
@@ -1392,7 +1390,20 @@ export function PluggProvider({
             isrc: s.isrc,
           })),
         },
-      }).catch((err) => console.warn("Could not save release to database:", err));
+      });
+      release.id = saved.releaseId;
+      release.status = saved.status;
+      release.audioProcessingStatus = saved.status === "processing" ? "pending" : "processing";
+      // Reload persisted IDs and processing state; do not invent a successful release locally.
+      try {
+        const fresh = await getInitialData();
+        setReleases(fresh.releases);
+        setTracks(fresh.tracks);
+      } catch {
+        // Submission already committed; a refresh failure must not invite duplicate submission.
+        toast.info("Release saved. Refresh your dashboard to see its latest status.");
+      }
+      setUploadDraft(null);
 
       return release;
     },
@@ -1510,19 +1521,10 @@ export function PluggProvider({
         if (!res.success) {
           throw new Error("Failed to process replacement audio");
         }
-        setTracks((prev) =>
-          prev.map((t) =>
-            t.id === trackId
-              ? {
-                  ...t,
-                  audioUrl,
-                  durationSeconds: durationSeconds || t.durationSeconds,
-                  audioProcessingStatus: "completed",
-                }
-              : t
-          )
-        );
-        toast.success("Corrected master audio processed and updated!");
+        const fresh = await getInitialData();
+        setReleases(fresh.releases);
+        setTracks(fresh.tracks);
+        toast.success("Replacement received. Processing and review are required before publication.");
         return res;
       } catch (err: any) {
         toast.error(err.message || "Failed to replace audio");
