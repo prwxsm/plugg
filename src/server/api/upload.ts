@@ -1,198 +1,62 @@
-import { localAudioProcessingEnabled } from "../processing-mode";
-import fs from "node:fs";
-import path from "node:path";
-import sql from "@/lib/db";
-import { getStorageProvider } from "@/lib/storage";
+import { createHash, randomUUID } from 'node:crypto';
+import defaultSql from '../../lib/db.ts';
+import { getStorageProvider } from '../../lib/storage/index.ts';
+import { localAudioProcessingEnabled } from '../processing-mode.ts';
+import { boundedUploadBody, inspectUpload, UploadError } from '../upload-policy.ts';
 
-export async function handleUploadRequest(request: Request): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  // No cloud uploads until private storage credentials and authenticated processing are ready.
-  if (!localAudioProcessingEnabled()) {
-    return Response.json({ error: "Cloud uploads are not available yet. Upload and process files through the local Plugg application." }, {
-      status: 503, headers: { "Cache-Control": "no-store" },
-    });
-  }
-
+// Keep multipart buffering bounded on the small free instance.
+let activeUploads = 0;
+export async function handleUploadRequest(request: Request, sql = defaultSql, storage = getStorageProvider()): Promise<Response> {
+  const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
+  if (request.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
+  const origin = request.headers.get('origin');
+  if (origin !== new URL(request.url).origin) return reply({ error: 'Upload from the Plugg website.' }, 403);
+  const session = request.headers.get('cookie')?.split(';').map(v => v.trim()).find(v => v.startsWith('plugg_session='))?.slice(14);
+  if (!session) return reply({ error: 'Sign in before uploading.' }, 401);
+  const [user] = await sql`SELECT u.id,u.artist_id,u.account_type FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=${session} AND s.expires_at>now()`;
+  if (!user) return reply({ error: 'Your session expired. Sign in again.' }, 401);
+  if (activeUploads >= 1) return reply({ error: 'Another upload is in progress. Please retry shortly.' }, 429);
+  const mode = process.env['STORAGE_PROVIDER'] || 'local';
+  if (mode !== 'r2' && !localAudioProcessingEnabled()) return reply({ error: 'Uploads are temporarily unavailable.' }, 503);
+  activeUploads++;
+  let savedKey: string | undefined;
+  let committed = false;
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const category = (formData.get("category") as string) || "audio";
-    const ownerId = (formData.get("ownerId") as string) || null;
-    const trackId = (formData.get("trackId") as string) || null;
-
-    if (!file || typeof file === "string") {
-      return new Response(JSON.stringify({ error: "No file provided" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    let technicalValidation = null;
-    if (category === "audio") {
-      const { inspectAudioHeader } = await import("@/lib/audio-validation");
-      const validation = inspectAudioHeader(buffer);
-      if (!validation.valid) {
-        return new Response(
-          JSON.stringify({
-            error: validation.error || "Audio file does not meet Plugg master requirements",
-            validation: validation.properties,
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
+    const body = await boundedUploadBody(request);
+    const form = await new Request(request.url, { method: 'POST', headers: { 'content-type': request.headers.get('content-type') || '' }, body }).formData();
+    const file = form.get('file');
+    const requestedCategory = String(form.get('category') || 'audio');
+    const category = requestedCategory === 'image' ? 'avatar' : requestedCategory;
+    if (!(file instanceof File)) throw new UploadError('No file provided');
+    if (category !== 'avatar' && (user['accountType'] !== 'artist' || !user['artistId'])) throw new UploadError('Artist account required.', 403);
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const info = inspectUpload(category, bytes);
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const fileId = randomUUID();
+    const key = `${category}/${randomUUID()}.${info.extension}`;
+    await sql.begin(async tx => {
+      // Serializes quota checks across server processes; ownership always comes from the session.
+      await tx`SELECT pg_advisory_xact_lock(734821,2)`;
+      const [quota] = await tx`SELECT coalesce(sum(size) FILTER (WHERE owner_id=${user['id']}),0)::bigint AS personal, coalesce(sum(size),0)::bigint AS total, count(*) FILTER (WHERE owner_id=${user['id']})::int AS count FROM files WHERE created_at>now()-interval '24 hours'`;
+      if (Number(quota?.['personal']) + bytes.length > 250 * 1024 * 1024 || Number(quota?.['count']) >= 30 || Number(quota?.['total']) + bytes.length > 1024 * 1024 * 1024)
+        throw new UploadError('Daily upload limit reached. Please try again tomorrow.', 429);
+      await storage.saveFile(key, bytes, info.mimeType);
+      savedKey = key;
+      if (category === 'audio' && localAudioProcessingEnabled()) {
+        const { probeAndValidateAudio } = await import('../audio-processor');
+        const { resolve } = await import('node:path');
+        const validation = await probeAndValidateAudio(resolve(process.env['STORAGE_DIR'] || '.storage/uploads', key));
+        if (!validation.valid) throw new UploadError(validation.error || 'Audio validation failed');
       }
-      technicalValidation = validation.properties;
-    }
-
-    // Sanitize filename
-    const cleanFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const uniqueSuffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const storageKey = `${category}/${uniqueSuffix}-${cleanFilename}`;
-
-    const storage = getStorageProvider();
-    await storage.saveFile(storageKey, buffer, file.type);
-
-    // Deep FFprobe validation on server-saved file
-    if (category === "audio") {
-      const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
-      const savedFilePath = path.join(baseDir, storageKey);
-      const { probeAndValidateAudio } = await import("@/server/audio-processor");
-      const probeResult = await probeAndValidateAudio(savedFilePath);
-      if (!probeResult.valid) {
-        try {
-          if (fs.existsSync(savedFilePath)) await fs.promises.unlink(savedFilePath);
-        } catch {}
-        return new Response(
-          JSON.stringify({
-            error: probeResult.error || "Audio file does not meet Plugg master requirements",
-            validation: probeResult.properties,
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-      technicalValidation = probeResult.properties;
-    }
-
-    const fileId = crypto.randomUUID();
-    const resolvedOwnerId = ownerId || "system";
-
-    const { computeBufferSha256 } = await import("@/lib/rights-validation");
-    const fileHash = computeBufferSha256(buffer);
-
-    let duplicateInfo: {
-      status: "none" | "same_artist" | "different_artist";
-      existingTrackTitle?: string;
-      existingReleaseTitle?: string;
-      existingPluggTrackId?: string;
-      existingTrackId?: string;
-    } = { status: "none" };
-
-    if (category === "audio") {
-      try {
-        let currentArtistId: string | null = null;
-        if (ownerId) {
-          const [userRow] = await sql<{ artist_id: string | null }[]>`
-            SELECT artist_id FROM users WHERE id = ${ownerId} LIMIT 1
-          `;
-          currentArtistId = userRow?.artist_id || null;
-        }
-
-        const matches = await sql<{
-          id: string;
-          title: string;
-          artist_id: string;
-          plugg_track_id: string;
-          release_id: string;
-          release_title: string;
-        }[]>`
-          SELECT t.id, t.title, t.artist_id, t.plugg_track_id, t.release_id, r.title AS release_title
-          FROM tracks t
-          JOIN releases r ON r.id = t.release_id
-          WHERE t.file_hash = ${fileHash}
-          ORDER BY t.created_at DESC
-          LIMIT 1
-        `;
-
-        if (matches.length > 0) {
-          const match = matches[0]!;
-          if (currentArtistId && match.artist_id === currentArtistId) {
-            duplicateInfo = {
-              status: "same_artist",
-              existingTrackTitle: match.title,
-              existingReleaseTitle: match.release_title,
-              existingPluggTrackId: match.plugg_track_id,
-              existingTrackId: match.id,
-            };
-          } else {
-            duplicateInfo = {
-              status: "different_artist",
-            };
-          }
-        }
-      } catch (dupErr) {
-        console.warn("Duplicate hash check error:", dupErr);
-      }
-    }
-
-    // Insert into files table if ownerId is a valid user, or without FK constraint issue
-    try {
-      if (ownerId) {
-        await sql`
-          INSERT INTO files (
-            id, owner_id, track_id, original_filename, storage_key, mime_type, size, category, storage_provider, upload_status, file_hash
-          )
-          VALUES (
-            ${fileId}, ${ownerId}, ${trackId}, ${file.name}, ${storageKey}, ${file.type || "application/octet-stream"},
-            ${file.size}, ${category}, 'local', 'ready', ${fileHash}
-          )
-        `;
-      }
-    } catch (dbErr) {
-      console.warn("Could not insert file record into DB:", dbErr);
-    }
-
-    const publicUrl = storage.getUrl(storageKey);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        fileId,
-        storageKey,
-        url: publicUrl,
-        filename: file.name,
-        size: file.size,
-        mimeType: file.type,
-        fileHash,
-        duplicateInfo,
-        technicalValidation,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-  } catch (err: any) {
-    console.error("Upload handler error:", err);
-    return new Response(
-      JSON.stringify({ error: err.message || "Failed to process upload" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-  }
+      await tx`INSERT INTO files (id,owner_id,original_filename,storage_key,mime_type,size,category,storage_provider,upload_status,file_hash)
+        VALUES (${fileId},${user['id']},${file.name.slice(0,255)},${key},${info.mimeType},${bytes.length},${category},${mode},'ready',${hash})`;
+    });
+    committed = true;
+    return reply({ success: true, fileId, storageKey: key, url: storage.getUrl(key), size: bytes.length, mimeType: info.mimeType, fileHash: hash, technicalValidation: info.validation, processingStatus: category === 'audio' ? 'pending' : 'ready' });
+  } catch (error) {
+    if (savedKey && !committed) await storage.deleteFile(savedKey).catch(() => console.error('Failed to clean up incomplete upload'));
+    if (error instanceof UploadError) return reply({ error: error.message }, error.status);
+    console.error('Upload failed', error instanceof Error ? error.name : 'Unknown error');
+    return reply({ error: 'Upload failed. Please retry; your release has not been submitted.' }, 500);
+  } finally { activeUploads--; }
 }

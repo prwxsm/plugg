@@ -1,9 +1,9 @@
-import { R2StorageProvider } from "./r2-storage";
-import { LocalStorageProvider } from "./local-storage";
-import type { StorageProvider } from "./types";
+import { R2StorageProvider } from "./r2-storage.ts";
+import { LocalStorageProvider } from "./local-storage.ts";
+import type { StorageProvider } from "./types.ts";
 
-export * from "./types";
-export * from "./local-storage";
+export * from "./types.ts";
+export * from "./local-storage.ts";
 
 let defaultProvider: StorageProvider | null = null;
 

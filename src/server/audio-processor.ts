@@ -1,13 +1,13 @@
-import { requireLocalAudioProcessing } from "./processing-mode";
+import { requireLocalAudioProcessing } from "./processing-mode.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import sql from "@/lib/db";
-import { getStorageProvider } from "@/lib/storage";
+import sql from "../lib/db.ts";
+import { getStorageProvider } from "../lib/storage/index.ts";
 import type { AudioVariantInfo, TechnicalValidation } from "@/data/types";
-import { inspectAudioHeader } from "@/lib/audio-validation";
-import { computeFileSha256 } from "@/lib/rights-validation";
+import { inspectAudioHeader } from "../lib/audio-validation.ts";
+import { computeFileSha256 } from "../lib/rights-validation.ts";
 
 const execAsync = promisify(exec);
 
@@ -47,7 +47,7 @@ function getExecutionEnv(): NodeJS.ProcessEnv {
 }
 
 async function runExec(cmd: string): Promise<{ stdout: string; stderr: string }> {
-  return execAsync(cmd, { env: getExecutionEnv() });
+  return execAsync(cmd, { env: getExecutionEnv(), timeout: 10 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
 }
 
 export interface ProcessAudioResult {
