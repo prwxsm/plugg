@@ -2,37 +2,37 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { Rail, PlayButton, ReleaseCard, TrackRow } from "@/components/plugg/media";
 import { Button, EmptyState, SectionHeader, VerifiedBadge } from "@/components/plugg/primitives";
-import { artists as seedArtists } from "@/data/artists";
 import { art } from "@/data/covers";
+import { buildArtistHeadMeta, DEFAULT_PUBLIC_ORIGIN } from "@/lib/og-meta";
 import { formatCount } from "@/lib/plugg";
+import { getArtistShareData } from "@/server-fns/data-functions";
 import { usePlugg } from "@/state/plugg-store";
 import { SocialIconsList } from "@/components/plugg/social-icons";
 
 export const Route = createFileRoute("/artist/$username")({
-  head: ({ params }) => {
-    const artist = seedArtists.find((a) => a.username === params.username);
-    const title = artist ? `${artist.displayName} — Plugg` : "Artist — Plugg";
-    const description = artist
-      ? `${artist.displayName} · ${formatCount(artist.monthlyListeners)} monthly listeners on Plugg.`
-      : "Artist profile on Plugg.";
-    return {
-      meta: [
-        { title },
-        { name: "description", content: description },
-        { property: "og:title", content: title },
-        { property: "og:description", content: description },
-      ],
-    };
+  loader: async ({ params }) => {
+    const data = await getArtistShareData({ data: params.username });
+    if (!data) throw notFound();
+    return data;
+  },
+  head: ({ loaderData, params }) => {
+    const origin =
+      loaderData?.origin ||
+      (typeof window !== "undefined" ? window.location.origin : DEFAULT_PUBLIC_ORIGIN);
+    return buildArtistHeadMeta(loaderData, params.username, origin);
   },
   component: ArtistPage,
 });
 
 function ArtistPage() {
+  const loaderData = Route.useLoaderData();
   const { username } = Route.useParams();
   const { artists, tracks, releases, isFollowing, toggleFollow, playTrack, currentTrack, isPlaying, togglePlay } =
     usePlugg();
 
-  const artist = artists.find((a) => a.username === username);
+  const artist = artists.find(
+    (a) => a.id === loaderData.id || a.username.toLowerCase() === username.toLowerCase(),
+  );
   if (!artist) throw notFound();
 
   const artistTracks = tracks.filter((t) => t.artistId === artist.id && t.published);
@@ -54,15 +54,11 @@ function ArtistPage() {
           />
           <div className="min-w-0 flex-1">
             <p className="text-eyebrow">{artist.verified ? "Verified Plugg Artist" : "Artist"}</p>
-            <div className="mt-1 flex items-start">
-              <h1 className="inline-flex flex-wrap items-start gap-1.5 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                <span className="truncate">{artist.displayName}</span>
-                {artist.verified ? (
-                  <span className="relative -top-0.5 sm:-top-1 inline-flex shrink-0 self-start" title="Verified Plugg Artist">
-                    <VerifiedBadge size="lg" />
-                  </span>
-                ) : null}
+            <div className="mt-1 flex items-center gap-2 min-w-0">
+              <h1 className="truncate text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                {artist.displayName}
               </h1>
+              {artist.verified ? <VerifiedBadge size="lg" /> : null}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatCount(artist.monthlyListeners)} monthly listeners

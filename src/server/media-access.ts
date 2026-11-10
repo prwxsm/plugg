@@ -38,3 +38,31 @@ export async function isStoredAudio(key: string) {
     EXISTS(SELECT 1 FROM tracks t WHERE t.audio_url IN (${"/api/stream/" + encodeURIComponent(key)},${"/api/file/" + encodeURIComponent(key)},${"/api/stream/" + key},${"/api/file/" + key}) OR starts_with(${key},'variants/'||t.id||'/')) AS audio`;
   return record?.["audio"] === true;
 }
+
+/** Returns true if a stored image key belongs to publicly visible user/artist/published artwork. */
+export async function isPublicStoredImage(key: string, connection: typeof sql = sql): Promise<boolean> {
+  if (!/\.(png|jpe?g|webp|gif)$/i.test(key)) return false;
+  const urls = ['/api/file/' + key, '/api/file/' + encodeURIComponent(key)];
+  const [publicImage] = await connection`SELECT
+    EXISTS(SELECT 1 FROM users WHERE avatar_url IN (${urls[0]!},${urls[1]!})) OR
+    EXISTS(SELECT 1 FROM artists WHERE avatar_url IN (${urls[0]!},${urls[1]!}) OR cover_url IN (${urls[0]!},${urls[1]!})) OR
+    EXISTS(SELECT 1 FROM releases WHERE cover_url IN (${urls[0]!},${urls[1]!}) AND status='published' AND NOT coalesce(rights_hold,false)) OR
+    EXISTS(SELECT 1 FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.cover_url IN (${urls[0]!},${urls[1]!}) AND t.published=true AND r.status='published' AND NOT coalesce(r.rights_hold,false)) AS allowed`;
+  return publicImage?.['allowed'] === true;
+}
+
+/** Only referenced public artwork is anonymous; documents and other uploads need an owner/staff session. */
+export async function canReadStoredFile(request: Request, key: string, connection: typeof sql = sql) {
+  if (await isPublicStoredImage(key, connection)) return true;
+  const urls = ['/api/file/' + key, '/api/file/' + encodeURIComponent(key)];
+  const cookie = request.headers.get('cookie')?.split(';').map(v => v.trim()).find(v => v.startsWith('plugg_session='))?.slice('plugg_session='.length);
+  if (!cookie) return false;
+  const [allowed] = await connection`SELECT EXISTS(
+    SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id
+    LEFT JOIN admin_memberships m ON m.user_id=u.id AND m.active
+    WHERE s.id=${cookie} AND s.expires_at>now() AND (
+      m.role IN ('super_admin','admin') OR EXISTS(SELECT 1 FROM files f WHERE f.storage_key=${key} AND f.owner_id=u.id)
+      OR (m.role='moderator' AND EXISTS(SELECT 1 FROM releases r WHERE r.cover_url IN (${urls[0]!},${urls[1]!}) AND r.status IN ('under_review','changes_required')))
+    )) AS allowed`;
+  return allowed?.['allowed'] === true;
+}

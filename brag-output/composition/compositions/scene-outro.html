@@ -1,0 +1,182 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: #0d0e14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+    }
+
+    .outro-glow {
+      position: absolute;
+      width: 1100px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(22, 24, 34, 0.5) 45%, transparent 75%);
+      pointer-events: none;
+    }
+
+    .outro-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .outro-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .outro-logo-img {
+      width: 90px;
+      height: 90px;
+      border-radius: 20px;
+      object-fit: contain;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 255, 255, 0.15);
+    }
+
+    .outro-brand-text {
+      font-size: 100px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      color: #ffffff;
+      line-height: 1;
+    }
+
+    .outro-tagline {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #fafafa;
+      margin-bottom: 24px;
+    }
+
+    .outro-desc {
+      font-size: 22px;
+      font-weight: 500;
+      color: #b0b8c8;
+      margin-bottom: 36px;
+      letter-spacing: -0.01em;
+    }
+
+    .outro-badge-group {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .outro-badge {
+      padding: 14px 32px;
+      border-radius: 9999px;
+      background: #ffffff;
+      color: #0d0e14;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.25);
+    }
+
+    .outro-sub-badge {
+      padding: 14px 28px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-outro" data-width="1920" data-height="1080">
+    <div id="outro-ambient-glow" class="clip outro-glow" data-start="0" data-duration="5.0"></div>
+
+    <div id="outro-main-content" class="clip outro-content" data-start="0" data-duration="5.0">
+      <div id="outro-logo-lock" class="outro-logo-row">
+        <img class="outro-logo-img" src="assets/images/logo.png" alt="Plugg" />
+        <span class="outro-brand-text">PLUGG</span>
+      </div>
+
+      <div id="outro-tagline-text" class="outro-tagline">
+        Stream. Publish. Amplify.
+      </div>
+
+      <div id="outro-desc-text" class="outro-desc">
+        The web player for independent African sound.
+      </div>
+
+      <div id="outro-badges-row" class="outro-badge-group">
+        <div class="outro-badge">Listen at plugg.site</div>
+        <div class="outro-sub-badge" data-layout-ignore>Nebbi • Westnile • Uganda</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tlOutro = gsap.timeline({ paused: true });
+
+    // Ambient halo expansion
+    tlOutro.fromTo(
+      "#outro-ambient-glow",
+      { opacity: 0, scale: 0.7 },
+      { opacity: 1, scale: 1.15, duration: 2.2, ease: "power2.out" },
+      0.1
+    );
+
+    // Monumental Logo slam
+    tlOutro.fromTo(
+      "#outro-logo-lock",
+      { opacity: 0, y: 50, scale: 0.88, filter: "blur(12px)" },
+      { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.9, ease: "power4.out" },
+      0.4
+    );
+
+    // Tagline reveal
+    tlOutro.fromTo(
+      "#outro-tagline-text",
+      { opacity: 0, y: 25 },
+      { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+      1.1
+    );
+
+    // Description text
+    tlOutro.fromTo(
+      "#outro-desc-text",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" },
+      1.7
+    );
+
+    // Badges arrival
+    tlOutro.fromTo(
+      "#outro-badges-row",
+      { opacity: 0, y: 20, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power4.out" },
+      2.47
+    );
+
+    // Glow accent pulsation
+    tlOutro.to(
+      "#outro-ambient-glow",
+      { scale: 1.25, opacity: 0.9, duration: 0.6, ease: "sine.inOut" },
+      3.56
+    );
+
+    // Holds steady and pristine until 5.0s for poster frame
+    window.__timelines["scene-outro"] = tlOutro;
+    tlOutro.seek(0);
+  </script>
+</template>

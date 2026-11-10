@@ -1,3 +1,4 @@
+import { validateStorageKey, storageMimeType, storageUrl } from "./media-key.ts";
 import fs from "node:fs";
 import path from "node:path";
 import type { StorageProvider } from "./types";
@@ -16,6 +17,7 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private resolveSafePath(key: string): string {
+    validateStorageKey(key);
     // Prevent directory traversal attacks
     const normalizedKey = path.normalize(key).replace(/^(\.\.(\/|\\|$))+/, "");
     const safePath = path.join(this.baseDir, normalizedKey);
@@ -34,6 +36,17 @@ export class LocalStorageProvider implements StorageProvider {
 
     await fs.promises.writeFile(filePath, data);
     return key;
+  }
+
+  async headFile(key: string) {
+    const filePath = this.resolveSafePath(key);
+    try {
+      const stat = await fs.promises.stat(filePath);
+      return stat.isFile() ? { key, size: stat.size, mimeType: storageMimeType(key) } : null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
   }
 
   async getFile(
@@ -100,41 +113,6 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
-  getUrl(key: string): string {
-    // If it's an audio file, route through the streaming API with byte-range support
-    const ext = path.extname(key).toLowerCase();
-    if ([".mp3", ".wav", ".ogg", ".opus", ".m4a", ".aac", ".flac"].includes(ext)) {
-      return `/api/stream/${encodeURIComponent(key)}`;
-    }
-    return `/api/file/${encodeURIComponent(key)}`;
-  }
-
-  private guessMimeType(filename: string): string {
-    const ext = path.extname(filename).toLowerCase();
-    switch (ext) {
-      case ".mp3":
-        return "audio/mpeg";
-      case ".wav":
-        return "audio/wav";
-      case ".ogg":
-        return "audio/ogg";
-      case ".m4a":
-        return "audio/mp4";
-      case ".aac":
-        return "audio/aac";
-      case ".flac":
-        return "audio/flac";
-      case ".jpg":
-      case ".jpeg":
-        return "image/jpeg";
-      case ".png":
-        return "image/png";
-      case ".webp":
-        return "image/webp";
-      case ".gif":
-        return "image/gif";
-      default:
-        return "application/octet-stream";
-    }
-  }
+  getUrl(key: string): string { return storageUrl(key); }
+  private guessMimeType(filename: string): string { return storageMimeType(filename); }
 }

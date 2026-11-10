@@ -1,3 +1,4 @@
+import { passwordError } from "@/lib/password-policy";
 import { useState } from "react";
 import { KeyRound, Mail, CheckCircle2, ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -90,8 +91,9 @@ export function ForgotPasswordModal({
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters long.");
+    const policyError = passwordError(newPassword);
+    if (policyError) {
+      setError(policyError);
       return;
     }
 
@@ -234,7 +236,7 @@ export function ForgotPasswordModal({
                 <input
                   type={showNewPassword ? "text" : "password"}
                   className={cn(inputClass, "pr-7")}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 15 characters"
                   value={newPassword}
                   onChange={(e) => {
                     setNewPassword(e.target.value);

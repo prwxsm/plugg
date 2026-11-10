@@ -1,3 +1,4 @@
+import { limitLogin } from "../login-rate-limit.ts";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import database from "../../lib/db.ts";
@@ -62,6 +63,8 @@ export async function handleAdminRequest(
     if (route === "login") {
       const data = loginInput.parse(body);
       const identifier = data.identifier.toLowerCase();
+      const retryAfter = limitLogin(identifier);
+      if (retryAfter) return json({ error: "Too many sign-in attempts. Please try again later." }, 429, { "Retry-After": String(retryAfter) });
       const [user] =
         await sql`SELECT u.id,u.password_hash FROM users u LEFT JOIN artists a ON a.id=u.artist_id WHERE lower(u.email)=${identifier} OR lower(u.username)=${identifier} OR lower(a.username)=${identifier} LIMIT 1`;
       if (!user?.["passwordHash"] || !(await bcrypt.compare(data.password, user["passwordHash"])))

@@ -1,0 +1,191 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"color-ground","type":"color","label":"Background","default":"#0d0e14"},
+    {"id":"color-surface","type":"color","label":"Surface","default":"#161822"},
+    {"id":"color-ink","type":"color","label":"Text","default":"#fafafa"},
+    {"id":"font-display","type":"string","label":"Display Font","default":"Inter"},
+    {"id":"font-sans","type":"string","label":"Sans Font","default":"Inter"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Plugg — Mobile Ad Campaign</title>
+    <script src="assets/vendor/gsap.min.js"></script>
+    <style>
+      :root {
+        --ground: #0d0e14;
+        --surface: #161822;
+        --surface-elevated: #202434;
+        --ink: #fafafa;
+        --ink-muted: #a0a5b5;
+        --border: rgba(255, 255, 255, 0.12);
+        --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: var(--ground);
+        font-family: var(--font-sans);
+        color: var(--ink);
+      }
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="19.0"
+      data-width="1080"
+      data-height="1920"
+    >
+      <!-- Scene 1: The Mobile Hook (0.0s - 4.2s) -->
+      <div
+        id="scene-hook"
+        data-composition-id="scene-hook"
+        data-composition-src="compositions/scene-hook.html"
+        data-start="0"
+        data-duration="4.2"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1080"
+        data-height="1920"
+      ></div>
+
+      <!-- Scene 2: The Plugg Mobile Player (4.2s - 9.2s) -->
+      <div
+        id="scene-player"
+        data-composition-id="scene-player"
+        data-composition-src="compositions/scene-player.html"
+        data-start="4.2"
+        data-duration="5.0"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1080"
+        data-height="1920"
+      ></div>
+
+      <!-- Scene 3: Direct Artist Telemetry (9.2s - 14.5s) -->
+      <div
+        id="scene-telemetry"
+        data-composition-id="scene-telemetry"
+        data-composition-src="compositions/scene-telemetry.html"
+        data-start="9.2"
+        data-duration="5.3"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1080"
+        data-height="1920"
+      ></div>
+
+      <!-- Scene 4: Mobile Ad Outro & CTA (14.5s - 19.0s) -->
+      <div
+        id="scene-outro"
+        data-composition-id="scene-outro"
+        data-composition-src="compositions/scene-outro.html"
+        data-start="14.5"
+        data-duration="4.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1080"
+        data-height="1920"
+      ></div>
+
+      <!-- Audio Track: Sonet - Forever soundtrack -->
+      <audio
+        id="bg-music"
+        data-start="0"
+        data-duration="19.0"
+        data-track-index="10"
+        data-volume="0.45"
+        data-fade-out="1.5"
+        src="assets/music/forever-by-sonet.mp3"
+      ></audio>
+
+      <!-- SFX: Scene 1 Atmospheric Bass Hook -->
+      <audio
+        id="sfx-impact-1"
+        data-start="0.4"
+        data-duration="0.2"
+        data-track-index="11"
+        data-volume="0.45"
+        src="assets/sfx/impact/impactSoft_medium_001.ogg"
+      ></audio>
+
+      <!-- SFX: Scene 2 Play Action Tap Click -->
+      <audio
+        id="sfx-click"
+        data-start="5.4"
+        data-duration="0.1"
+        data-track-index="11"
+        data-volume="0.65"
+        src="assets/sfx/ui/mouseclick1.ogg"
+      ></audio>
+
+      <!-- SFX: Scene 3 Beat-Grid Telemetry Drops -->
+      <audio
+        id="sfx-card-1"
+        data-start="10.2"
+        data-duration="0.15"
+        data-track-index="11"
+        data-volume="0.45"
+        src="assets/sfx/interface/drop_001.ogg"
+      ></audio>
+
+      <audio
+        id="sfx-card-2"
+        data-start="11.2"
+        data-duration="0.15"
+        data-track-index="11"
+        data-volume="0.45"
+        src="assets/sfx/interface/drop_001.ogg"
+      ></audio>
+
+      <audio
+        id="sfx-card-3"
+        data-start="12.2"
+        data-duration="0.15"
+        data-track-index="11"
+        data-volume="0.45"
+        src="assets/sfx/interface/drop_001.ogg"
+      ></audio>
+
+      <!-- SFX: Scene 4 Final Brand Bell Hit -->
+      <audio
+        id="sfx-bell"
+        data-start="15.6"
+        data-duration="1.5"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/impact/impactBell_heavy_000.ogg"
+      ></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      if (typeof gsap !== "undefined") {
+        const mainTimeline = gsap.timeline({ paused: true });
+        window.__timelines["main"] = mainTimeline;
+        mainTimeline.seek(0);
+      }
+    </script>
+  </body>
+</html>

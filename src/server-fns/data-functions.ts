@@ -1,3 +1,4 @@
+import { verificationInput, submitVerificationApplication } from "../server/artist-verification";
 import { createServerFn } from "@tanstack/react-start";
 import sql from "@/lib/db";
 import { getUserFromSession } from "@/lib/auth";
@@ -12,6 +13,7 @@ import type {
   ReleaseStatus,
   RecordingType,
   UploaderRole,
+  ArtistVerificationApplication,
 } from "@/data/types";
 import {
   PLUGG_RIGHTS_DECLARATION_TEXT,
@@ -20,10 +22,7 @@ import {
   normalizeIsrc,
 } from "@/lib/rights-validation";
 import { fallbackAnalytics } from "@/data/analytics";
-import { goLiveAt, todayISO } from "@/lib/plugg";
-import { tracks as seedTracks } from "@/data/tracks";
-import { artists as seedArtists } from "@/data/artists";
-import { releases as seedReleases } from "@/data/releases";
+import { goLiveAt } from "@/lib/plugg";
 
 export function parseSocialLinks(val: unknown): Record<string, string> {
   if (!val) return {};
@@ -244,11 +243,11 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
            COALESCE(technical_validation, '{}'::jsonb) as "technicalValidation",
            COALESCE(review_history, '[]'::jsonb) as "reviewHistory",
            COALESCE(uploader_role, 'owner') as "uploaderRole",
-           COALESCE(rights_declaration_accepted, false) as "rightsDeclarationAccepted",
+           (rights_declaration_text IS NOT NULL) as "rightsDeclarationAccepted",
            rights_declaration_text as "rightsDeclarationText",
            rights_declaration_version as "rightsDeclarationVersion",
            rights_declaration_timestamp as "rightsDeclarationTimestamp",
-           rights_declaration_user_id as "rightsDeclaredByUserId",
+           rights_declared_by_user_id as "rightsDeclaredByUserId",
            COALESCE(rights_hold, false) as "rightsHold",
            rights_hold_reason as "rightsHoldReason",
            rights_hold_placed_at as "rightsHoldPlacedAt",
@@ -404,6 +403,49 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
   const targetArtistId = user?.artistId || "a1";
   const analytics = await fetchArtistAnalytics(targetArtistId);
 
+  let verificationApplication: ArtistVerificationApplication | null = null;
+  if (user?.artistId) {
+    const [app] = await sql<any[]>`
+      SELECT id, artist_id as "artistId", user_id as "userId", stage_name as "stageName",
+             legal_name as "legalName", contact_email as "contactEmail", contact_phone as "contactPhone",
+             country, city, primary_genre as "primaryGenre", supporting_links as "supportingLinks",
+             note, status, admin_feedback as "adminFeedback", reviewed_at as "reviewedAt",
+             reviewer_id as "reviewerId", created_at as "createdAt", updated_at as "updatedAt"
+      FROM artist_verification_applications
+      WHERE artist_id = ${user.artistId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    if (app) {
+      verificationApplication = {
+        id: app.id,
+        artistId: app.artistId,
+        userId: app.userId,
+        stageName: app.stageName,
+        legalName: app.legalName,
+        contactEmail: app.contactEmail,
+        contactPhone: app.contactPhone || undefined,
+        country: app.country || undefined,
+        city: app.city || undefined,
+        primaryGenre: app.primaryGenre || undefined,
+        supportingLinks: Array.isArray(app.supportingLinks) ? app.supportingLinks : [],
+        note: app.note || undefined,
+        status: app.status,
+        adminFeedback: app.adminFeedback || null,
+        reviewedAt: app.reviewedAt
+          ? app.reviewedAt instanceof Date
+            ? app.reviewedAt.toISOString()
+            : String(app.reviewedAt)
+          : null,
+        reviewerId: app.reviewerId || null,
+        createdAt:
+          app.createdAt instanceof Date ? app.createdAt.toISOString() : String(app.createdAt),
+        updatedAt:
+          app.updatedAt instanceof Date ? app.updatedAt.toISOString() : String(app.updatedAt),
+      };
+    }
+  }
+
   return {
     artists,
     tracks,
@@ -414,6 +456,7 @@ export const getInitialData = createServerFn({ method: "GET" }).handler(async ()
     likedTrackIds,
     followingArtistIds,
     analytics,
+    verificationApplication,
   };
 });
 
@@ -841,9 +884,19 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
 
     const { release, songs } = data;
 
+    if (!release || !Array.isArray(songs) || songs.length < 1 || songs.length > 30 ||
+        typeof release.title !== "string" || !release.title.trim() || release.title.length > 200 ||
+        !["single", "EP", "album"].includes(release.type) ||
+        songs.some(song => typeof song.title !== "string" || !song.title.trim() || song.title.length > 200)) {
+      throw new Error("Provide a release title and between 1 and 30 named tracks.");
+    }
+    const { ownedUpload } = await import("@/server/upload-reference");
+    const provider = process.env["STORAGE_PROVIDER"] || "local";
+    if (release.status !== "draft") await ownedUpload(sql, release.coverUrl, user.id, "cover", provider);
+
     // Validate mandatory copyright declaration for non-draft submissions
     const isDraft = release.status === "draft";
-    if (!isDraft && !release.rightsDeclarationAccepted) {
+    if (!isDraft && release.rightsDeclarationAccepted !== true) {
       throw new Error(
         "Mandatory copyright declaration must be confirmed before submitting for review.",
       );
@@ -853,17 +906,33 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     const baseSlug =
       release.title
         .toLowerCase()
-        .replace(/[^a-z0-9]/g, "-")
-        .replace(/-+/g, "-") || "release";
-    const releaseSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "release";
+    let releaseSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const [dup] = await sql<{ id: string }[]>`SELECT id FROM releases WHERE slug = ${releaseSlug} LIMIT 1`;
+      if (!dup) break;
+      releaseSlug = `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
 
     const goLive = release.goLiveAt
       ? new Date(release.goLiveAt)
       : new Date(goLiveAt(release.releaseDate));
 
+    const { localAudioProcessingEnabled } = await import("@/server/processing-mode");
+    const processingEnabled = localAudioProcessingEnabled();
+
     // New submissions enter processing -> under_review workflow unless explicitly saved as draft
-    const initialStatus: ReleaseStatus = isDraft ? "draft" : "under_review";
-    const initialProcessingStatus = isDraft ? "completed" : "processing";
+    const initialStatus: ReleaseStatus = isDraft
+      ? "draft"
+      : processingEnabled
+        ? "under_review"
+        : "processing";
+    const initialProcessingStatus = isDraft
+      ? "completed"
+      : processingEnabled
+        ? "processing"
+        : "pending";
     const reviewHistory = isDraft
       ? []
       : [
@@ -887,17 +956,12 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     }[] = [];
 
     for (const song of songs) {
-      // 1. Resolve SHA-256 hash
-      let hash = song.fileHash || null;
-      if (!hash && song.audioUrl) {
-        const cleanKey = decodeURIComponent(
-          song.audioUrl.replace(/^\/api\/stream\//, "").replace(/^\/api\/file\//, ""),
-        );
-        const [fileRow] = await sql<{ file_hash: string | null }[]>`
-          SELECT file_hash FROM files WHERE storage_key = ${cleanKey} LIMIT 1
-        `;
-        if (fileRow?.file_hash) hash = fileRow.file_hash;
-      }
+      // Never trust a submitted hash or another artist's storage URL.
+      const uploaded = song.audioUrl
+        ? await ownedUpload(sql, song.audioUrl, user.id, "audio", provider)
+        : null;
+      if (!isDraft && !uploaded) throw new Error("Upload audio for every track before submitting.");
+      const hash = uploaded?.fileHash || null;
 
       // 2. Validate and normalize ISRC if supplied
       let normIsrc: string | null = null;
@@ -955,8 +1019,8 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         INSERT INTO releases (
           id, artist_id, title, slug, type, cover_url, release_date, status, go_live_at,
           description, label, review_submitted_at, audio_processing_status, review_history, is_mock,
-          uploader_role, rights_declaration_accepted, rights_declaration_text, rights_declaration_version,
-          rights_declaration_timestamp, rights_declaration_user_id,
+          uploader_role, rights_declaration_text, rights_declaration_version,
+          rights_declaration_timestamp, rights_declared_by_user_id,
           rights_hold, rights_hold_reason, rights_hold_placed_at, rights_hold_placed_by
         )
         VALUES (
@@ -976,7 +1040,6 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
           ${JSON.stringify(reviewHistory)},
           false,
           ${release.uploaderRole || "owner"},
-          ${declarationAccepted},
           ${declarationText},
           ${declarationVersion},
           ${declarationAccepted ? sql`now()` : null},
@@ -996,9 +1059,14 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         const songBaseSlug =
           song.title
             .toLowerCase()
-            .replace(/[^a-z0-9]/g, "-")
-            .replace(/-+/g, "-") || "track";
-        const songSlug = `${songBaseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "track";
+        let songSlug = `${songBaseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const [dup] = await tx<{ id: string }[]>`SELECT id FROM tracks WHERE slug = ${songSlug} LIMIT 1`;
+          if (!dup) break;
+          songSlug = `${songBaseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
 
         // Generate Plugg Track ID using the sequence (concurrency-safe)
         const idRows = await tx<{ pluggTrackId: string }[]>`
@@ -1053,7 +1121,7 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     });
 
     // Run audio variant generation in background / async for real audio files
-    if (!isDraft && createdTrackJobs.length > 0) {
+    if (processingEnabled && !isDraft && createdTrackJobs.length > 0) {
       (async () => {
         try {
           const { processMasterAudio } = await import("@/server/audio-processor");
@@ -1250,11 +1318,7 @@ export const updateTrackFn = createServerFn({ method: "POST" })
 
 export const replaceTrackAudioFn = createServerFn({ method: "POST" })
   .validator(
-    (data: {
-      trackId: string;
-      audioUrl: string;
-      durationSeconds?: number | undefined;
-    }) => data,
+    (data: { trackId: string; audioUrl: string; durationSeconds?: number | undefined }) => data,
   )
   .handler(async ({ data }) => {
     const user = await getUserFromSession();
@@ -1263,6 +1327,23 @@ export const replaceTrackAudioFn = createServerFn({ method: "POST" })
     }
 
     const { trackId, audioUrl } = data;
+
+    if (process.env["STORAGE_PROVIDER"] === "r2") {
+      const { ownedUpload } = await import("@/server/upload-reference");
+      const file = await ownedUpload(sql, audioUrl, user.id, "audio", "r2");
+      return sql.begin(async tx => {
+        const [target] = await tx`SELECT r.id,r.status FROM releases r JOIN tracks t ON t.release_id=r.id WHERE t.id=${trackId} AND t.artist_id=${user.artistId!} FOR UPDATE OF r`;
+        if (!target || !["changes_required", "draft", "under_review"].includes(target["status"])) throw new Error("Replacement requires a draft or release awaiting review/corrections.");
+        await tx`SELECT id FROM tracks WHERE id=${trackId} FOR UPDATE`;
+        await tx`UPDATE tracks SET audio_url=${audioUrl},file_hash=${file.fileHash},audio_variants='{}',technical_validation='{}',audio_processing_status='pending',published=false,updated_at=now() WHERE id=${trackId}`;
+        await tx`UPDATE releases SET status='processing',audio_processing_status='pending',reviewer_id=NULL,updated_at=now() WHERE id=${target["id"]}`;
+        await tx`UPDATE tracks SET published=false WHERE release_id=${target["id"]}`;
+        const [duplicate] = await tx`SELECT id FROM tracks WHERE file_hash=${file.fileHash} AND artist_id<>${user.artistId!} LIMIT 1`;
+        if (duplicate) await tx`UPDATE releases SET rights_hold=true,rights_hold_reason='Replacement recording matches another artist. Staff rights review required.',rights_hold_placed_at=now(),rights_hold_placed_by='system' WHERE id=${target["id"]}`;
+
+        return { success: true, trackId, pending: true, variants: {}, technicalValidation: {} };
+      });
+    }
 
     // Verify track ownership and allowed replacement state
     const [track] = await sql<
@@ -1465,94 +1546,61 @@ export const upgradeToArtistFn = createServerFn({ method: "POST" })
 
 export const getTrackShareData = createServerFn({ method: "GET" })
   .validator((d: string) => d)
-  .handler(async ({ data: trackId }) => {
-    try {
-      const dbTracks = await sql<
-        {
-          id: string;
-          pluggTrackId: string;
-          artistId: string;
-          releaseId: string;
-          title: string;
-          slug: string;
-          genre: string;
-          coverUrl: string;
-          audioUrl: string | null;
-          durationSeconds: number;
-          playCount: string | number;
-          features: string | null;
-          producers: string | null;
-          lyrics: string | null;
-          artistName: string | null;
-          artistUsername: string | null;
-          artistAvatarUrl: string | null;
-          releaseTitle: string | null;
-          releaseSlug: string | null;
-        }[]
-      >`
-        SELECT t.id, t.plugg_track_id as "pluggTrackId", t.artist_id as "artistId", t.release_id as "releaseId", t.title, t.slug,
-               t.genre, t.cover_url as "coverUrl", t.audio_url as "audioUrl", t.duration_seconds as "durationSeconds",
-               t.play_count as "playCount", t.features, t.producers, t.lyrics,
-               a.display_name as "artistName", a.username as "artistUsername", a.avatar_url as "artistAvatarUrl",
-               r.title as "releaseTitle", r.slug as "releaseSlug"
-        FROM tracks t
-        LEFT JOIN artists a ON a.id = t.artist_id
-        LEFT JOIN releases r ON r.id = t.release_id
-        WHERE t.id = ${trackId}
-        LIMIT 1
-      `;
+  .handler(async ({ data: trackRef }) => {
+    const [{ getRequestHeaders, getRequestUrl }, { resolveRequestOrigin }, { fetchTrackShareRecord }] =
+      await Promise.all([
+        import("@tanstack/react-start/server"),
+        import("@/lib/og-meta"),
+        import("@/server/og-share-lookup"),
+      ]);
+    const record = await fetchTrackShareRecord(trackRef);
+    if (!record) return null;
+    const origin = resolveRequestOrigin(
+      getRequestHeaders(),
+      getRequestUrl({ xForwardedHost: true, xForwardedProto: true }),
+    );
+    return { ...record, origin };
+  });
 
-      if (dbTracks.length > 0) {
-        const row = dbTracks[0]!;
-        return {
-          id: row.id,
-          pluggTrackId: row.pluggTrackId || undefined,
-          artistId: row.artistId,
-          releaseId: row.releaseId,
-          title: row.title,
-          slug: row.slug,
-          genre: row.genre || "",
-          coverUrl: row.coverUrl || "",
-          audioUrl: row.audioUrl || null,
-          durationSeconds: Number(row.durationSeconds) || 0,
-          playCount: Number(row.playCount) || 0,
-          features: row.features || undefined,
-          producers: row.producers || undefined,
-          lyrics: row.lyrics || undefined,
-          artistName: row.artistName || "Artist",
-          artistUsername: row.artistUsername || "",
-          artistAvatarUrl: row.artistAvatarUrl || "",
-          releaseTitle: row.releaseTitle || "",
-          releaseSlug: row.releaseSlug || "",
-        };
-      }
-    } catch (e) {
-      console.error("Error looking up track from database:", e);
-    }
+export const getReleaseShareData = createServerFn({ method: "GET" })
+  .validator((d: string) => d)
+  .handler(async ({ data: releaseRef }) => {
+    const [{ getRequestHeaders, getRequestUrl }, { resolveRequestOrigin }, { fetchReleaseShareRecord }] =
+      await Promise.all([
+        import("@tanstack/react-start/server"),
+        import("@/lib/og-meta"),
+        import("@/server/og-share-lookup"),
+      ]);
+    const record = await fetchReleaseShareRecord(releaseRef);
+    if (!record) return null;
+    const origin = resolveRequestOrigin(
+      getRequestHeaders(),
+      getRequestUrl({ xForwardedHost: true, xForwardedProto: true }),
+    );
+    return { ...record, origin };
+  });
 
-    // Fallback to seed data
-    const seedTrack = seedTracks.find((t) => t.id === trackId);
-    if (!seedTrack) return null;
-    const seedArtist = seedArtists.find((a) => a.id === seedTrack.artistId);
-    const seedRelease = seedReleases.find((r) => r.id === seedTrack.releaseId);
-    return {
-      id: seedTrack.id,
-      artistId: seedTrack.artistId,
-      releaseId: seedTrack.releaseId,
-      title: seedTrack.title,
-      slug: seedTrack.slug,
-      genre: seedTrack.genre,
-      coverUrl: seedTrack.coverUrl,
-      audioUrl: seedTrack.audioUrl,
-      durationSeconds: seedTrack.durationSeconds,
-      playCount: seedTrack.playCount,
-      features: seedTrack.features,
-      producers: seedTrack.producers,
-      lyrics: seedTrack.lyrics,
-      artistName: seedArtist?.displayName ?? "Artist",
-      artistUsername: seedArtist?.username ?? "",
-      artistAvatarUrl: seedArtist?.avatarUrl ?? "",
-      releaseTitle: seedRelease?.title ?? "",
-      releaseSlug: seedRelease?.slug ?? "",
-    };
+export const getArtistShareData = createServerFn({ method: "GET" })
+  .validator((d: string) => d)
+  .handler(async ({ data: artistRef }) => {
+    const [{ getRequestHeaders, getRequestUrl }, { resolveRequestOrigin }, { fetchArtistShareRecord }] =
+      await Promise.all([
+        import("@tanstack/react-start/server"),
+        import("@/lib/og-meta"),
+        import("@/server/og-share-lookup"),
+      ]);
+    const record = await fetchArtistShareRecord(artistRef);
+    if (!record) return null;
+    const origin = resolveRequestOrigin(
+      getRequestHeaders(),
+      getRequestUrl({ xForwardedHost: true, xForwardedProto: true }),
+    );
+    return { ...record, origin };
+  });
+
+export const submitVerificationApplicationFn = createServerFn({ method: "POST" })
+  .validator((data: unknown) => verificationInput.parse(data))
+  .handler(async ({ data }) => {
+    const user = await getUserFromSession();
+    return sql.begin((tx) => submitVerificationApplication(tx, user, data));
   });

@@ -1,3 +1,4 @@
+import { passwordError } from "@/lib/password-policy";
 import { useState } from "react";
 import { KeyRound, Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -11,10 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button, Field, inputClass } from "@/components/plugg/primitives";
 import { cn } from "@/lib/utils";
-import {
-  verifyCurrentPasswordFn,
-  changeUserPasswordFn,
-} from "@/server-fns/auth-functions";
+import { verifyCurrentPasswordFn, changeUserPasswordFn } from "@/server-fns/auth-functions";
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -22,11 +20,7 @@ interface ChangePasswordModalProps {
   onSuccess?: () => void;
 }
 
-export function ChangePasswordModal({
-  open,
-  onOpenChange,
-  onSuccess,
-}: ChangePasswordModalProps) {
+export function ChangePasswordModal({ open, onOpenChange, onSuccess }: ChangePasswordModalProps) {
   const [step, setStep] = useState<"current" | "new">("current");
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -82,8 +76,9 @@ export function ChangePasswordModal({
     e.preventDefault();
     setError(null);
 
-    if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters long.");
+    const policyError = passwordError(newPassword);
+    if (policyError) {
+      setError(policyError);
       return;
     }
 
@@ -199,7 +194,7 @@ export function ChangePasswordModal({
                 </DialogTitle>
               </div>
               <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                Create a strong new password with at least 6 characters.
+                Create a strong new password with at least 15 characters.
               </DialogDescription>
             </DialogHeader>
 
@@ -212,7 +207,7 @@ export function ChangePasswordModal({
                     setNewPassword(e.target.value);
                     setError(null);
                   }}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 15 characters"
                   className={cn(inputClass, "pr-7")}
                   required
                   minLength={6}

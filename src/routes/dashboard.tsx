@@ -748,7 +748,7 @@ function YourReleasesTab() {
                       {isProcessingFailed
                         ? "Processing failed"
                         : isProcessing
-                          ? "Processing audio"
+                          ? (release.audioProcessingStatus === "pending" ? "Awaiting processing" : "Processing audio")
                           : isUnderReview
                             ? "Under review"
                             : isChangesRequired
@@ -865,9 +865,9 @@ function YourReleasesTab() {
                   {isProcessing && !isProcessingFailed && (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 px-3.5 py-2.5 text-xs text-cyan-300">
                       <Loader2 size={13} className="shrink-0 text-cyan-400 animate-spin" />
-                      <span className="font-medium text-foreground">Processing Audio &amp; Generating Variants</span>
+                      <span className="font-medium text-foreground">Awaiting Audio Processing</span>
                       <span className="text-muted-foreground">·</span>
-                      <span className="text-cyan-200">Server is validating technical audio and creating streaming &amp; download files. Proceeds to review automatically.</span>
+                      <span className="text-cyan-200">Your upload is saved. Our team will validate it and prepare playback files before review.</span>
                     </div>
                   )}
 
@@ -1109,9 +1109,9 @@ function TrackAudioReplacer({
         throw new Error(uploadData.error || "Failed to upload replacement audio");
       }
 
-      setStatusMessage("Generating variants & verifying…");
+      setStatusMessage("Submitting replacement…");
       await replaceTrackAudio(track.id, uploadData.url, realSec > 0 ? realSec : undefined);
-      toast.success(`Corrected audio master updated for "${track.title}"!`);
+      toast.success(`Replacement received for "${track.title}".`);
       onAudioReplaced?.();
     } catch (err: any) {
       toast.error(err.message || "Audio replacement failed. Working audio was preserved.");

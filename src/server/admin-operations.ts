@@ -1,3 +1,4 @@
+import { reviewVerificationApplication } from "./artist-verification.ts";
 import sql from "../lib/db.ts";
 import { requirePermission, type AdminPermission } from "./admin-rbac.ts";
 import { futureMidnight } from "./admin-review.ts";
@@ -16,6 +17,7 @@ export const operationInput = z
       "update_complaint",
       "verify_artist",
       "edit_artist",
+      "review_verification",
       "create_genre",
       "edit_genre",
       "delete_genre",
@@ -36,6 +38,8 @@ export const operationInput = z
     bio: z.string().max(3000).optional(),
     location: z.string().max(200).optional(),
     verified: z.boolean().optional(),
+    verificationStatus: z.enum(["approved", "rejected", "more_info_required"]).optional(),
+    feedback: z.string().trim().max(3000).optional(),
     role: z.enum(["admin", "moderator", "none"]).optional(),
     password: z.string().max(200).optional(),
     username: z
@@ -51,7 +55,9 @@ export const operationInput = z
       .transform((v) => v.toLowerCase())
       .optional(),
     initialPassword: z.string().min(12).max(72).optional(),
-    complaintStatus: z.enum(["received", "under_investigation", "resolved", "dismissed"]).optional(),
+    complaintStatus: z
+      .enum(["received", "under_investigation", "resolved", "dismissed"])
+      .optional(),
     complainantName: z.string().trim().max(200).optional(),
     complainantEmail: z.string().trim().email().max(254).optional(),
     conflictNature: z.string().trim().max(2000).optional(),
@@ -73,6 +79,7 @@ const permissions: Record<z.infer<typeof operationInput>["action"], AdminPermiss
   update_complaint: "content.takedown",
   verify_artist: "artists.write",
   edit_artist: "artists.write",
+  review_verification: "artists.write",
   create_genre: "genres.write",
   edit_genre: "genres.write",
   delete_genre: "genres.write",
@@ -294,6 +301,16 @@ export async function administer(
           verified: before["verified"],
         };
       }
+    } else if (data.action === "review_verification") {
+      targetType = "artist_verification";
+      ({ before, after } = await reviewVerificationApplication(
+        tx,
+        targetId,
+        actor.id,
+        data.verificationStatus,
+        data.feedback,
+        data.reason,
+      ));
     } else {
       targetType = "genre";
       await tx`LOCK TABLE genres,tracks,artists IN SHARE ROW EXCLUSIVE MODE`;

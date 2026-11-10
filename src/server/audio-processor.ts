@@ -1,12 +1,13 @@
+import { requireLocalAudioProcessing } from "./processing-mode.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import sql from "@/lib/db";
-import { getStorageProvider } from "@/lib/storage";
+import sql from "../lib/db.ts";
+import { getStorageProvider } from "../lib/storage/index.ts";
 import type { AudioVariantInfo, TechnicalValidation } from "@/data/types";
-import { inspectAudioHeader } from "@/lib/audio-validation";
-import { computeFileSha256 } from "@/lib/rights-validation";
+import { inspectAudioHeader } from "../lib/audio-validation.ts";
+import { computeFileSha256 } from "../lib/rights-validation.ts";
 
 const execAsync = promisify(exec);
 
@@ -46,7 +47,7 @@ function getExecutionEnv(): NodeJS.ProcessEnv {
 }
 
 async function runExec(cmd: string): Promise<{ stdout: string; stderr: string }> {
-  return execAsync(cmd, { env: getExecutionEnv() });
+  return execAsync(cmd, { env: getExecutionEnv(), timeout: 10 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
 }
 
 export interface ProcessAudioResult {
@@ -85,6 +86,7 @@ export async function probeAndValidateAudio(filePath: string): Promise<{
   qualityWarning?: string | undefined;
   properties: TechnicalValidation;
 }> {
+  requireLocalAudioProcessing();
   // 1. First run fast binary header inspection
   let headerValidation: ReturnType<typeof inspectAudioHeader> | null = null;
   try {
@@ -342,6 +344,7 @@ export async function processMasterAudio(
   trackId: string,
   persist = true,
 ): Promise<ProcessAudioResult> {
+  requireLocalAudioProcessing();
   const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
 
   const cleanMasterKey = path.normalize(masterStorageKey).replace(/^(\.\.(\/|\\|$))+/, "");
@@ -573,6 +576,7 @@ export async function replaceTrackAudioMaster(
   actorId?: string,
   actorName?: string,
 ): Promise<ProcessAudioResult> {
+  requireLocalAudioProcessing();
   const baseDir = path.resolve(process.cwd(), process.env["STORAGE_DIR"] || ".storage/uploads");
   const cleanMasterKey = path.normalize(replacementStorageKey).replace(/^(\.\.(\/|\\|$))+/, "").replace(/\\/g, "/");
   let masterFilePath: string;

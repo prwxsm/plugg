@@ -1,0 +1,215 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1080px;
+      height: 1920px;
+      background: #0d0e14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+      padding: 80px 50px;
+      color: #fafafa;
+    }
+
+    .outro-glow {
+      position: absolute;
+      width: 1000px;
+      height: 1000px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.09) 0%, rgba(26, 32, 50, 0.45) 45%, transparent 75%);
+      pointer-events: none;
+    }
+
+    .outro-container {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 960px;
+    }
+
+    .outro-logo-img {
+      width: 160px;
+      height: 160px;
+      border-radius: 36px;
+      object-fit: contain;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 50px rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 36px;
+    }
+
+    .outro-brand-text {
+      font-size: 130px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      color: #ffffff;
+      line-height: 1;
+      margin-bottom: 24px;
+    }
+
+    .outro-tagline {
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #ffffff;
+      margin-bottom: 24px;
+    }
+
+    .outro-desc {
+      font-size: 34px;
+      font-weight: 500;
+      color: #b0b8c8;
+      margin-bottom: 60px;
+      line-height: 1.3;
+    }
+
+    /* Action CTA Section */
+    .outro-cta-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      width: 100%;
+      margin-bottom: 50px;
+    }
+
+    .btn-cta-main {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 64px;
+      border-radius: 9999px;
+      background: #ffffff;
+      color: #0d0e14;
+      font-size: 38px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      box-shadow: 0 15px 40px rgba(255, 255, 255, 0.35);
+      border: none;
+    }
+
+    .btn-cta-url {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 36px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .outro-region-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 30px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #fafafa;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-outro" data-width="1080" data-height="1920">
+    <div id="outro-bg-glow" class="clip outro-glow" data-start="0" data-duration="4.5" data-layout-allow-overflow></div>
+
+    <div class="outro-container">
+      <img id="outro-logo" src="assets/images/logo.png" alt="Plugg" class="outro-logo-img" />
+
+      <h1 id="outro-brand" class="outro-brand-text">PLUGG.</h1>
+
+      <p id="outro-tagline" class="outro-tagline">
+        STREAM. PUBLISH. AMPLIFY.
+      </p>
+
+      <p id="outro-desc" class="outro-desc">
+        The modern player for independent African sound.
+      </p>
+
+      <div id="outro-cta-box" class="outro-cta-wrap">
+        <div class="btn-cta-main">
+          OPEN WEB PLAYER
+        </div>
+        <div class="btn-cta-url">
+          plugg.site
+        </div>
+      </div>
+
+      <div id="outro-region-pill" class="outro-region-badge" data-layout-ignore>
+        <span data-layout-ignore>NEBBI • WESTNILE • UGANDA • EAST AFRICA</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tlOutro = gsap.timeline({ paused: true });
+
+    // Glow breathe
+    tlOutro.fromTo(
+      "#outro-bg-glow",
+      { opacity: 0.4, scale: 0.88 },
+      { opacity: 1, scale: 1.12, duration: 3.0, ease: "power2.out" },
+      0
+    );
+
+    // Logo & Brand mark entrance
+    tlOutro.fromTo(
+      ["#outro-logo", "#outro-brand"],
+      { opacity: 0, scale: 0.86, y: 30 },
+      { opacity: 1, scale: 1.0, y: 0, duration: 0.8, stagger: 0.1, ease: "power4.out" },
+      0.1
+    );
+
+    // Tagline entrance
+    tlOutro.fromTo(
+      "#outro-tagline",
+      { opacity: 0, y: 24 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+      0.5
+    );
+
+    // Description
+    tlOutro.fromTo(
+      "#outro-desc",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+      0.8
+    );
+
+    // CTA Box lands with impact at 1.1s local (= 15.6s film)
+    tlOutro.fromTo(
+      "#outro-cta-box",
+      { opacity: 0, scale: 0.92, y: 30 },
+      { opacity: 1, scale: 1.0, y: 0, duration: 0.7, ease: "back.out(1.5)" },
+      1.1
+    );
+
+    // Region badge
+    tlOutro.fromTo(
+      "#outro-region-pill",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" },
+      1.5
+    );
+
+    window.__timelines["scene-outro"] = tlOutro;
+    tlOutro.seek(0);
+  </script>
+</template>

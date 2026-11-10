@@ -1,0 +1,565 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 1,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "duplicate_media_discovery_risk",
+        "severity": "warning",
+        "message": "Detected 2 matching img entries with the same source/start/duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "/home/prwxsm/Projects/plugg/brag-output/composition/compositions/scene-player.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Avoid duplicated media nodes that can be discovered twice during compilation."
+      }
+    ],
+    "filesScanned": 5
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 6,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-impact-1\" is 0.19s but its slot (data-duration) is 2.00s — the slot is shortened to the media length when rendered. Set data-duration to ~0.19s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "20",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-click\" is 0.06s but its slot (data-duration) is 0.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.06s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "20",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-card-1\" is 0.11s but its slot (data-duration) is 1.00s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "20",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-card-2\" is 0.11s but its slot (data-duration) is 1.00s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "20",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-card-3\" is 0.11s but its slot (data-duration) is 1.00s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "20",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-bell\" is 1.48s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~1.48s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "20",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      }
+    ]
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 20,
+    "samples": [
+      1.111,
+      3.333,
+      5.556,
+      7.778,
+      10,
+      12.222,
+      14.444,
+      16.667,
+      18.889
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      1.111,
+      5.556,
+      10,
+      14.444,
+      18.889
+    ],
+    "checked": 36,
+    "passed": 36
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 5,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "first_frame_empty",
+        "severity": "warning",
+        "message": "Frame 0 shows only the background, and the first frame is the thumbnail on social players: have the title or key image already on screen at 0 s instead of entering from nothing; see references/review.md.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and \"East Africa • Nairobi • Dar es Salaam • Kampala\" renders at 14 px for 4.00 s: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "East Africa • Nairobi • Dar es Salaam • Kampala",
+        "selector": "#hook-pill-target > span:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene-hook.html",
+        "bbox": {
+          "x": 722.22,
+          "y": 443.19,
+          "width": 493.53,
+          "height": 17
+        },
+        "time": 0.5,
+        "times": [
+          0.5
+        ],
+        "fontPx": 13.81,
+        "floorPx": 28,
+        "seconds": 4,
+        "elements": [
+          {
+            "selector": "#hook-pill-target > span:nth-of-type(2)",
+            "text": "East Africa • Nairobi • Dar es Salaam • Kampala",
+            "fontPx": 13.81,
+            "time": 0.5,
+            "seconds": 4
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 16 text elements stay under it for 0.5 s or more, the smallest \"Web Player\" at 11 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "Web Player",
+        "selector": "span.brand-tag",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene-player.html",
+        "bbox": {
+          "x": 221.39,
+          "y": 25.18,
+          "width": 83.83,
+          "height": 14
+        },
+        "time": 4.75,
+        "times": [
+          4.75,
+          4.75,
+          4.75,
+          4.75,
+          4.75,
+          4.75,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5.25,
+          5.25,
+          5.25,
+          5.25,
+          5.25
+        ],
+        "fontPx": 11,
+        "floorPx": 28,
+        "seconds": 4.75,
+        "elements": [
+          {
+            "selector": "span.brand-tag",
+            "text": "Web Player",
+            "fontPx": 11,
+            "time": 4.75,
+            "seconds": 4.75
+          },
+          {
+            "selector": "div.progress-bar-wrap > span:nth-of-type(1)",
+            "text": "1:24",
+            "fontPx": 11.83,
+            "time": 5.25,
+            "seconds": 4.25
+          },
+          {
+            "selector": "div.progress-bar-wrap > span:nth-of-type(2)",
+            "text": "3:45",
+            "fontPx": 11.83,
+            "time": 5.25,
+            "seconds": 4.25
+          },
+          {
+            "selector": "div.status-badge-right > span:nth-of-type(2)",
+            "text": "Lossless 24-bit",
+            "fontPx": 11.83,
+            "time": 5.25,
+            "seconds": 4.25
+          },
+          {
+            "selector": "span.genre-pill",
+            "text": "Afro-fusion",
+            "fontPx": 12.82,
+            "time": 5,
+            "seconds": 4.5
+          },
+          {
+            "selector": "span.track-artist-text",
+            "text": "Zuri Mwangi • Nairobi",
+            "fontPx": 12.82,
+            "time": 5.25,
+            "seconds": 4.25
+          },
+          {
+            "selector": "span.active",
+            "text": "Discover",
+            "fontPx": 15,
+            "time": 4.75,
+            "seconds": 4.75
+          },
+          {
+            "selector": "div.nav-links > span:nth-of-type(2)",
+            "text": "Releases",
+            "fontPx": 15,
+            "time": 4.75,
+            "seconds": 4.75
+          },
+          {
+            "selector": "div.nav-links > span:nth-of-type(3)",
+            "text": "Artists",
+            "fontPx": 15,
+            "time": 4.75,
+            "seconds": 4.75
+          },
+          {
+            "selector": "div.nav-links > span:nth-of-type(4)",
+            "text": "Library",
+            "fontPx": 15,
+            "time": 4.75,
+            "seconds": 4.75
+          },
+          {
+            "selector": "div.album-meta-row > span:nth-of-type(3)",
+            "text": "EP • 3 Tracks",
+            "fontPx": 15.78,
+            "time": 5,
+            "seconds": 4.5
+          },
+          {
+            "selector": "div.album-meta-row > span:nth-of-type(5)",
+            "text": "Nairobi, Kenya",
+            "fontPx": 15.78,
+            "time": 5,
+            "seconds": 4.5
+          },
+          {
+            "selector": "span.track-title-text",
+            "text": "Lakeside Gold",
+            "fontPx": 15.78,
+            "time": 5.25,
+            "seconds": 4.25
+          },
+          {
+            "selector": "span.artist-name",
+            "text": "Zuri Mwangi",
+            "fontPx": 17.75,
+            "time": 5,
+            "seconds": 4.5
+          },
+          {
+            "selector": "#play-state-text",
+            "text": "Stream Now",
+            "fontPx": 17.75,
+            "time": 5,
+            "seconds": 4.5
+          },
+          {
+            "selector": "span.brand-name",
+            "text": "PLUGG",
+            "fontPx": 24,
+            "time": 4.75,
+            "seconds": 4.75
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 7 text elements stay under it for 0.5 s or more, the smallest \"Active in 42 Regions\" at 12 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "Active in 42 Regions",
+        "selector": "#stat-card-2 > div:nth-of-type(3) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene-telemetry.html",
+        "bbox": {
+          "x": 776.2,
+          "y": 676.48,
+          "width": 115.05,
+          "height": 14.56
+        },
+        "time": 12.125,
+        "times": [
+          10,
+          11.125,
+          11.125,
+          12.125,
+          12.125,
+          13.25,
+          13.25
+        ],
+        "fontPx": 11.65,
+        "floorPx": 28,
+        "seconds": 2.875,
+        "elements": [
+          {
+            "selector": "#stat-card-2 > div:nth-of-type(3) > span:nth-of-type(1)",
+            "text": "Active in 42 Regions",
+            "fontPx": 11.65,
+            "time": 12.125,
+            "seconds": 2.875
+          },
+          {
+            "selector": "#stat-card-3 > div:nth-of-type(2) > span:nth-of-type(1)",
+            "text": "Direct Royalty Payouts",
+            "fontPx": 11.77,
+            "time": 13.25,
+            "seconds": 1.75
+          },
+          {
+            "selector": "div.stat-pill.stat-pill-green > span:nth-of-type(1)",
+            "text": "↑ 36% Growth MoM",
+            "fontPx": 11.83,
+            "time": 11.125,
+            "seconds": 3.875
+          },
+          {
+            "selector": "div.telemetry-eyebrow",
+            "text": "Independent Artist Distribution",
+            "fontPx": 13.81,
+            "time": 10,
+            "seconds": 5
+          },
+          {
+            "selector": "#stat-card-2 > div:nth-of-type(2)",
+            "text": "Monthly Listeners",
+            "fontPx": 14.56,
+            "time": 12.125,
+            "seconds": 2.875
+          },
+          {
+            "selector": "#stat-card-1 > div:nth-of-type(2)",
+            "text": "Total Streams",
+            "fontPx": 14.79,
+            "time": 11.125,
+            "seconds": 3.875
+          },
+          {
+            "selector": "#stat-card-3 > div:nth-of-type(1)",
+            "text": "Verified Creator",
+            "fontPx": 19.62,
+            "time": 13.25,
+            "seconds": 1.75
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 3 text elements stay under it for 0.5 s or more, the smallest \"East Africa & Global\" at 15 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "East Africa & Global",
+        "selector": "div.outro-sub-badge",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene-outro.html",
+        "bbox": {
+          "x": 999.49,
+          "y": 660.04,
+          "width": 155.66,
+          "height": 18.72
+        },
+        "time": 17.625,
+        "times": [
+          16.875,
+          17.625,
+          17.625
+        ],
+        "fontPx": 14.78,
+        "floorPx": 28,
+        "seconds": 2.375,
+        "elements": [
+          {
+            "selector": "div.outro-sub-badge",
+            "text": "East Africa & Global",
+            "fontPx": 14.78,
+            "time": 17.625,
+            "seconds": 2.375
+          },
+          {
+            "selector": "div.outro-badge",
+            "text": "Listen at plugg.africa",
+            "fontPx": 15.76,
+            "time": 17.625,
+            "seconds": 2.375
+          },
+          {
+            "selector": "#outro-desc-text",
+            "text": "The web player for independent African sound.",
+            "fontPx": 20,
+            "time": 16.875,
+            "seconds": 3.125
+          }
+        ]
+      }
+    ],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 160
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

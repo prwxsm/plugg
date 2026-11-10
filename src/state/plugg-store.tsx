@@ -15,9 +15,10 @@ import { genres as seedGenres } from "@/data/genres";
 import { playlists as seedPlaylists } from "@/data/playlists";
 import { releases as seedReleases } from "@/data/releases";
 import { tracks as seedTracks } from "@/data/tracks";
-import type { Analytics, Artist, Genre, Playlist, RecordingType, Release, Track, UploaderRole, User } from "@/data/types";
-import { goLiveAt, select, slugify } from "@/lib/plugg";
+import type { Analytics, Artist, ArtistVerificationApplication, Genre, Playlist, RecordingType, Release, Track, UploaderRole, User } from "@/data/types";
+import { goLiveAt, select, slugify, formatRelativeTime, formatDate } from "@/lib/plugg";
 import {
+  getInitialData,
   toggleLikeTrackFn,
   toggleFollowArtistFn,
   createPlaylistFn,
@@ -37,6 +38,7 @@ import {
   resubmitReleaseFn,
   retryTrackProcessingFn,
   replaceTrackAudioFn,
+  submitVerificationApplicationFn,
 } from "@/server-fns/data-functions";
 import { logoutUser, updateUserProfileFn, deleteUserAccountFn } from "@/server-fns/auth-functions";
 import { useAuthPrompt } from "@/components/plugg/auth-prompt-modal";
@@ -76,43 +78,273 @@ export interface PluggNotification {
   description: string;
   timestamp: string;
   targetUrl: string;
-  type: "drop" | "playlist" | "milestone" | "system";
+  type: "drop" | "playlist" | "milestone" | "system" | "verification" | "alert";
 }
 
-export const defaultNotifications: PluggNotification[] = [
-  {
-    id: "notif-1",
-    title: "New drop: Fresh releases from artists you follow",
-    description: "Accra Motion by Bina Osel and more new releases are now ready to play.",
-    timestamp: "12 minutes ago",
-    targetUrl: "/discover",
-    type: "drop",
-  },
-  {
-    id: "notif-2",
-    title: "Your weekly discovery mix has been refreshed",
-    description: "Handpicked Afrobeats, Amapiano, and East African vibes tailored for you.",
-    timestamp: "Today",
-    targetUrl: "/discover",
-    type: "playlist",
-  },
-  {
-    id: "notif-3",
-    title: "Milestone: 10,000 monthly streams reached",
-    description: "Your artist catalog is gaining listeners across Lagos, Nairobi, and London.",
-    timestamp: "Yesterday",
-    targetUrl: "/dashboard",
-    type: "milestone",
-  },
-  {
-    id: "notif-4",
-    title: "Trending: 'Bad' is climbing the charts",
-    description: "Your track was featured in top daily listener queues.",
-    timestamp: "2 days ago",
-    targetUrl: "/discover",
-    type: "system",
-  },
-];
+export const defaultNotifications: PluggNotification[] = [];
+
+/**
+ * Dynamically derives real, contextual system notifications based on the user's
+ * actual account status, artist profile, moderation workflow, milestones, and followed drops.
+ */
+export function generateRealNotifications({
+  session,
+  currentUser,
+  currentArtist,
+  releases,
+  tracks,
+  artists,
+  playlists,
+  likedTrackIds,
+  followingArtistIds,
+  analytics,
+  verificationApplication,
+  dismissedIds,
+}: {
+  session: SessionState;
+  currentUser: User | null;
+  currentArtist: Artist | null;
+  releases: Release[];
+  tracks: Track[];
+  artists: Artist[];
+  playlists: Playlist[];
+  likedTrackIds: string[];
+  followingArtistIds: string[];
+  analytics?: Analytics;
+  verificationApplication?: ArtistVerificationApplication | null;
+  dismissedIds: Set<string>;
+}): PluggNotification[] {
+  if (session === "loggedOut" || !currentUser) {
+    return [];
+  }
+
+  const items: PluggNotification[] = [];
+
+  // 1. Artist Verification Status (Crucial Actionable Alerts for Artists)
+  if (currentArtist) {
+    if (verificationApplication) {
+      if (verificationApplication.status === "more_info_required") {
+        items.push({
+          id: `verify-more-info-${verificationApplication.id}-${verificationApplication.reviewedAt || verificationApplication.updatedAt || "latest"}`,
+          title: "Verification: Action Required",
+          description: verificationApplication.adminFeedback
+            ? `Reviewer note: "${verificationApplication.adminFeedback}". Please update your details and resubmit.`
+            : "The review team requested additional information or active music links for your verification.",
+          timestamp: formatRelativeTime(verificationApplication.reviewedAt || verificationApplication.updatedAt),
+          targetUrl: "/profile?verify=1",
+          type: "verification",
+        });
+      } else if (verificationApplication.status === "approved" || currentArtist.verified) {
+        items.push({
+          id: `verify-approved-${verificationApplication.id || currentArtist.id}`,
+          title: "Artist Profile Verified!",
+          description: `Congratulations! Your artist profile "${currentArtist.displayName}" has been officially verified with the blue badge.`,
+          timestamp: formatRelativeTime(verificationApplication.reviewedAt || verificationApplication.updatedAt),
+          targetUrl: "/profile",
+          type: "verification",
+        });
+      } else if (verificationApplication.status === "rejected") {
+        items.push({
+          id: `verify-declined-${verificationApplication.id}-${verificationApplication.reviewedAt || verificationApplication.updatedAt || "latest"}`,
+          title: "Verification Application Declined",
+          description: verificationApplication.adminFeedback
+            ? `Reviewer feedback: "${verificationApplication.adminFeedback}". You can update your links and re-apply.`
+            : "Your verification request was not approved at this time. You can view details and re-apply.",
+          timestamp: formatRelativeTime(verificationApplication.reviewedAt || verificationApplication.updatedAt),
+          targetUrl: "/profile?verify=1",
+          type: "verification",
+        });
+      } else if (verificationApplication.status === "pending") {
+        items.push({
+          id: `verify-pending-${verificationApplication.id}`,
+          title: "Verification Application Under Review",
+          description: "Your artist verification application has been submitted and is currently in the review queue.",
+          timestamp: formatRelativeTime(verificationApplication.createdAt),
+          targetUrl: "/profile?verify=1",
+          type: "verification",
+        });
+      }
+    } else if (!currentArtist.verified) {
+      items.push({
+        id: `verify-prompt-${currentArtist.id}`,
+        title: "Claim Your Verified Artist Badge",
+        description: "Apply for free artist verification to establish your stage identity and build trust with fans on Plugg.",
+        timestamp: "Get verified",
+        targetUrl: "/profile?verify=1",
+        type: "verification",
+      });
+    }
+
+    // 2. Artist Release Review & Moderation Workflow
+    const myReleases = releases.filter((r) => r.artistId === currentArtist.id);
+    for (const release of myReleases) {
+      if (release.status === "changes_required") {
+        items.push({
+          id: `release-changes-${release.id}-${release.reviewedAt || release.reviewSubmittedAt || "latest"}`,
+          title: `Changes Requested: "${release.title}"`,
+          description: release.reviewFeedback
+            ? `Review note: "${release.reviewFeedback}". Adjust your audio or release details in the upload manager.`
+            : `Revisions were requested for your release "${release.title}". Review feedback and resubmit.`,
+          timestamp: formatRelativeTime(release.reviewedAt || release.reviewSubmittedAt),
+          targetUrl: "/upload",
+          type: "alert",
+        });
+      } else if (release.rightsHold) {
+        items.push({
+          id: `release-hold-${release.id}`,
+          title: `Rights Hold Notice: "${release.title}"`,
+          description: release.rightsHoldReason
+            ? `A temporary rights hold was placed: "${release.rightsHoldReason}". Review in your dashboard.`
+            : `A temporary rights hold was placed on "${release.title}".`,
+          timestamp: "Notice",
+          targetUrl: "/dashboard",
+          type: "alert",
+        });
+      } else if (release.status === "under_review") {
+        items.push({
+          id: `release-pending-${release.id}`,
+          title: `Release Under Review: "${release.title}"`,
+          description: `"${release.title}" was submitted and is awaiting audio quality and rights verification.`,
+          timestamp: formatRelativeTime(release.reviewSubmittedAt || release.createdAt),
+          targetUrl: "/dashboard",
+          type: "system",
+        });
+      }
+    }
+
+    // Failed audio processing tracks
+    const myTracks = tracks.filter((t) => t.artistId === currentArtist.id);
+    const failedTracks = myTracks.filter((t) => t.audioProcessingStatus === "failed");
+    for (const track of failedTracks.slice(0, 2)) {
+      items.push({
+        id: `track-failed-${track.id}`,
+        title: `Encoding Issue: "${track.title}"`,
+        description: "Audio processing failed for this track. You can retry processing or replace the audio file in your dashboard.",
+        timestamp: "Action needed",
+        targetUrl: "/dashboard",
+        type: "alert",
+      });
+    }
+
+    // Recent Live releases published by artist
+    const liveReleases = myReleases
+      .filter((r) => r.status === "published" || (!r.status as any))
+      .sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    for (const release of liveReleases.slice(0, 2)) {
+      items.push({
+        id: `release-live-${release.id}`,
+        title: `Release Live: "${release.title}"`,
+        description: `"${release.title}" (${release.type.toUpperCase()}) is officially live and streaming on Plugg.`,
+        timestamp: formatRelativeTime(release.releaseDate),
+        targetUrl: `/playlist/${release.id}`,
+        type: "drop",
+      });
+    }
+
+    // 3. Artist Audience & Streaming Milestones
+    if (currentArtist.monthlyListeners > 0) {
+      items.push({
+        id: `milestone-listeners-${currentArtist.id}-${Math.floor(currentArtist.monthlyListeners / 500) * 500 || currentArtist.monthlyListeners}`,
+        title: `Audience Milestone: ${currentArtist.monthlyListeners.toLocaleString()} Listeners`,
+        description: `Your artist catalog currently has ${currentArtist.monthlyListeners.toLocaleString()} monthly active listeners across Plugg.`,
+        timestamp: "Milestone",
+        targetUrl: "/dashboard",
+        type: "milestone",
+      });
+    }
+
+    if (analytics?.totalPlays && analytics.totalPlays > 0) {
+      items.push({
+        id: `milestone-plays-${currentArtist.id}-${Math.floor(analytics.totalPlays / 100) * 100}`,
+        title: `Streaming Activity: ${analytics.totalPlays.toLocaleString()} Plays`,
+        description: `Your songs have crossed ${analytics.totalPlays.toLocaleString()} total streams on Plugg.`,
+        timestamp: "Milestone",
+        targetUrl: "/dashboard",
+        type: "milestone",
+      });
+    }
+
+    // Profile completion tip
+    if (!currentArtist.bio || currentArtist.bio.trim().length < 10 || !currentArtist.avatarUrl) {
+      items.push({
+        id: `profile-incomplete-${currentArtist.id}`,
+        title: "Complete Your Artist Profile",
+        description: "Add a bio and profile picture so listeners discovering your music can learn more about you.",
+        timestamp: "Profile tip",
+        targetUrl: "/profile",
+        type: "system",
+      });
+    }
+  }
+
+  // 4. Drops from Followed Artists (for both Listeners and Artists who follow other creators)
+  if (followingArtistIds.length > 0) {
+    const followedReleases = releases
+      .filter((r) => followingArtistIds.includes(r.artistId) && (r.status === "published" || (!r.status as any)))
+      .sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime())
+      .slice(0, 3);
+
+    for (const rel of followedReleases) {
+      const art = artists.find((a) => a.id === rel.artistId);
+      items.push({
+        id: `drop-followed-${rel.id}`,
+        title: `New Drop from ${art?.displayName || "Artist you follow"}`,
+        description: `"${rel.title}" (${rel.type.toUpperCase()}) is now available to stream.`,
+        timestamp: formatRelativeTime(rel.releaseDate),
+        targetUrl: `/playlist/${rel.id}`,
+        type: "drop",
+      });
+    }
+  } else {
+    items.push({
+      id: "follow-suggestions-prompt",
+      title: "Follow Artists to Get Real Drops",
+      description: "Follow your favorite creators on Plugg to get notified the moment they drop new tracks and albums.",
+      timestamp: "Suggestion",
+      targetUrl: "/discover",
+      type: "playlist",
+    });
+  }
+
+  // 5. Library & Playlist Activity
+  const userPlaylists = playlists.filter((p) => p.userId === currentUser.id);
+  if (userPlaylists.length > 0) {
+    const primaryPlaylist = userPlaylists[0];
+    if (primaryPlaylist && primaryPlaylist.trackIds.length > 0) {
+      items.push({
+        id: `playlist-activity-${primaryPlaylist.id}-${primaryPlaylist.trackIds.length}`,
+        title: `Your Playlist: "${primaryPlaylist.name}"`,
+        description: `Your playlist has ${primaryPlaylist.trackIds.length} track${primaryPlaylist.trackIds.length === 1 ? "" : "s"} ready for playback.`,
+        timestamp: "Your library",
+        targetUrl: `/playlist/${primaryPlaylist.id}`,
+        type: "playlist",
+      });
+    }
+  }
+
+  if (likedTrackIds.length > 0) {
+    items.push({
+      id: `liked-tracks-activity-${Math.floor(likedTrackIds.length / 5) * 5 || likedTrackIds.length}`,
+      title: `Liked Songs: ${likedTrackIds.length} Saved Track${likedTrackIds.length === 1 ? "" : "s"}`,
+      description: `You have ${likedTrackIds.length} favorite track${likedTrackIds.length === 1 ? "" : "s"} saved in your library ready for offline playback.`,
+      timestamp: "Your library",
+      targetUrl: "/library",
+      type: "playlist",
+    });
+  } else {
+    items.push({
+      id: "liked-tracks-prompt",
+      title: "Save Music to Your Library",
+      description: "Tap the heart on any song to save favorites for quick access and offline listening.",
+      timestamp: "Getting started",
+      targetUrl: "/discover",
+      type: "playlist",
+    });
+  }
+
+  // Filter out any dismissed notification IDs
+  return items.filter((item) => !dismissedIds.has(item.id));
+}
 
 export interface SongDraft {
   title: string;
@@ -190,6 +422,7 @@ export interface InitialData {
   likedTrackIds?: string[];
   followingArtistIds?: string[];
   analytics?: Analytics;
+  verificationApplication?: ArtistVerificationApplication | null;
 }
 
 interface PluggContextValue {
@@ -242,6 +475,18 @@ interface PluggContextValue {
   uploadDraft: UploadDraft | null;
   saveUploadDraft: (draft: UploadDraft) => void;
   clearUploadDraft: () => void;
+  verificationApplication: ArtistVerificationApplication | null;
+  submitVerificationApplication: (data: {
+    legalName: string;
+    contactEmail: string;
+    contactPhone?: string | undefined;
+    country?: string | undefined;
+    city?: string | undefined;
+    primaryGenre?: string | undefined;
+    supportingLinks: string[];
+    note?: string | undefined;
+    accuracyConfirmed?: boolean | undefined;
+  }) => Promise<ArtistVerificationApplication>;
   // review workflow
   approveRelease: (releaseId: string, newReleaseDate?: string) => Promise<void>;
   requestChangesRelease: (releaseId: string, feedback: string) => Promise<void>;
@@ -351,28 +596,28 @@ export function PluggProvider({
 }) {
   const { showAuthPrompt } = useAuthPrompt();
   const [artists, setArtists] = useState<Artist[]>(
-    initialData?.artists?.length ? initialData.artists : seedArtists,
+    initialData?.artists ?? [],
   );
   const [tracks, setTracks] = useState<Track[]>(
-    initialData?.tracks?.length ? initialData.tracks : seedTracks,
+    initialData?.tracks ?? [],
   );
   const [releases, setReleases] = useState<Release[]>(
-    initialData?.releases?.length ? initialData.releases : seedReleases,
+    initialData?.releases ?? [],
   );
   const [playlists, setPlaylists] = useState<Playlist[]>(
-    initialData?.playlists?.length ? initialData.playlists : seedPlaylists,
+    initialData?.playlists ?? [],
   );
   const genres = useMemo(
-    () => (initialData?.genres?.length ? initialData.genres : seedGenres),
+    () => (initialData?.genres ?? []),
     [initialData?.genres],
   );
 
   // Sync state if initialData is provided/updated
   useEffect(() => {
-    if (initialData?.artists?.length) setArtists(initialData.artists);
-    if (initialData?.tracks?.length) setTracks(initialData.tracks);
-    if (initialData?.releases?.length) setReleases(initialData.releases);
-    if (initialData?.playlists?.length) setPlaylists(initialData.playlists);
+    if (initialData?.artists) setArtists(initialData.artists);
+    if (initialData?.tracks) setTracks(initialData.tracks);
+    if (initialData?.releases) setReleases(initialData.releases);
+    if (initialData?.playlists) setPlaylists(initialData.playlists);
     if (initialData?.likedTrackIds) setLikedTrackIds(initialData.likedTrackIds);
     if (initialData?.followingArtistIds) setFollowingArtistIds(initialData.followingArtistIds);
     if (initialData?.user) {
@@ -381,6 +626,9 @@ export function PluggProvider({
     } else if (initialData && initialData.user === null) {
       setDbUser(null);
       setSession("loggedOut");
+    }
+    if (initialData?.verificationApplication !== undefined) {
+      setVerificationApplication(initialData.verificationApplication);
     }
   }, [initialData]);
 
@@ -391,6 +639,11 @@ export function PluggProvider({
     }
     return "loggedOut";
   });
+
+  const [verificationApplication, setVerificationApplication] =
+    useState<ArtistVerificationApplication | null>(
+      initialData?.verificationApplication ?? null,
+    );
 
   const [likedTrackIds, setLikedTrackIds] = useState<string[]>(initialData?.likedTrackIds ?? []);
   const [followingArtistIds, setFollowingArtistIds] = useState<string[]>(
@@ -412,7 +665,17 @@ export function PluggProvider({
   const [upgradedArtistId, setUpgradedArtistId] = useState<string | null>(null);
   const [uploadDraft, setUploadDraft] = useState<UploadDraft | null>(null);
   const [restored, setRestored] = useState(false);
-  const [allNotifications, setAllNotifications] = useState<PluggNotification[]>(defaultNotifications);
+  const [dismissedNotifIds, setDismissedNotifIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem("plugg:dismissed_notifs");
+        if (stored) return JSON.parse(stored);
+      } catch {
+        /* ignore */
+      }
+    }
+    return [];
+  });
 
   // User playback & notification settings
   const [settings, setSettings] = useState<UserSettings>(() => {
@@ -462,55 +725,29 @@ export function PluggProvider({
     });
   }, []);
 
+  // Remove legacy simulated notifications from localStorage if present
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem("plugg:notifications");
-      if (stored) {
-        setAllNotifications(JSON.parse(stored));
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem("plugg:notifications");
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
     }
   }, []);
 
   const clearNotification = useCallback((id: string) => {
-    setAllNotifications((prev) => {
-      const updated = prev.filter((n) => n.id !== id);
+    setDismissedNotifIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const updated = [...prev, id];
       try {
-        window.localStorage.setItem("plugg:notifications", JSON.stringify(updated));
+        window.localStorage.setItem("plugg:dismissed_notifs", JSON.stringify(updated));
       } catch {
         /* ignore */
       }
       return updated;
     });
   }, []);
-
-  const clearAllNotifications = useCallback(() => {
-    setAllNotifications([]);
-    try {
-      window.localStorage.setItem("plugg:notifications", JSON.stringify([]));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const restoreDefaultNotifications = useCallback(() => {
-    setAllNotifications(defaultNotifications);
-    try {
-      window.localStorage.setItem("plugg:notifications", JSON.stringify(defaultNotifications));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // Filter visible notifications by active notification settings
-  const notifications = useMemo(() => {
-    return allNotifications.filter((n) => {
-      if (n.type === "drop" && !settings.notifyNewReleases) return false;
-      if (n.type === "playlist" && !settings.notifyWeeklyDigest) return false;
-      return true;
-    });
-  }, [allNotifications, settings.notifyNewReleases, settings.notifyWeeklyDigest]);
 
   // Restore client-only state (drafts, queue, recents) from localStorage
   useEffect(() => {
@@ -585,6 +822,70 @@ export function PluggProvider({
       fans: currentArtist.fans,
     };
   }, [currentArtist, initialData?.analytics]);
+
+  const dismissedSet = useMemo(() => new Set(dismissedNotifIds), [dismissedNotifIds]);
+
+  const realNotifications = useMemo(() => {
+    return generateRealNotifications({
+      session,
+      currentUser,
+      currentArtist,
+      releases,
+      tracks,
+      artists,
+      playlists,
+      likedTrackIds,
+      followingArtistIds,
+      analytics,
+      verificationApplication,
+      dismissedIds: dismissedSet,
+    });
+  }, [
+    session,
+    currentUser,
+    currentArtist,
+    releases,
+    tracks,
+    artists,
+    playlists,
+    likedTrackIds,
+    followingArtistIds,
+    analytics,
+    verificationApplication,
+    dismissedSet,
+  ]);
+
+  const clearAllNotifications = useCallback(() => {
+    setDismissedNotifIds((prev) => {
+      const currentIds = realNotifications.map((n) => n.id);
+      const updated = Array.from(new Set([...prev, ...currentIds]));
+      try {
+        window.localStorage.setItem("plugg:dismissed_notifs", JSON.stringify(updated));
+      } catch {
+        /* ignore */
+      }
+      return updated;
+    });
+  }, [realNotifications]);
+
+  const restoreDefaultNotifications = useCallback(() => {
+    setDismissedNotifIds([]);
+    try {
+      window.localStorage.removeItem("plugg:dismissed_notifs");
+      window.localStorage.removeItem("plugg:notifications");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Filter visible notifications by active notification settings
+  const notifications = useMemo(() => {
+    return realNotifications.filter((n) => {
+      if (n.type === "drop" && !settings.notifyNewReleases) return false;
+      if (n.type === "playlist" && !settings.notifyWeeklyDigest) return false;
+      return true;
+    });
+  }, [realNotifications, settings.notifyNewReleases, settings.notifyWeeklyDigest]);
 
   // ── HTML5 Audio Engine & Play Tracking ──
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1282,12 +1583,9 @@ export function PluggProvider({
         rightsDeclarationVersion: input.rightsDeclarationAccepted ? "2026-10-31.1" : undefined,
       };
 
-      setTracks((prev) => [...newTracks, ...prev]);
-      setReleases((prev) => [release, ...prev]);
-      setUploadDraft(null);
 
       // Persist to database
-      createReleaseWithTracksFn({
+      const saved = await createReleaseWithTracksFn({
         data: {
           release: {
             title: input.title,
@@ -1316,7 +1614,20 @@ export function PluggProvider({
             isrc: s.isrc,
           })),
         },
-      }).catch((err) => console.warn("Could not save release to database:", err));
+      });
+      release.id = saved.releaseId;
+      release.status = saved.status;
+      release.audioProcessingStatus = saved.status === "processing" ? "pending" : "processing";
+      // Reload persisted IDs and processing state; do not invent a successful release locally.
+      try {
+        const fresh = await getInitialData();
+        setReleases(fresh.releases);
+        setTracks(fresh.tracks);
+      } catch {
+        // Submission already committed; a refresh failure must not invite duplicate submission.
+        toast.info("Release saved. Refresh your dashboard to see its latest status.");
+      }
+      setUploadDraft(null);
 
       return release;
     },
@@ -1342,6 +1653,14 @@ export function PluggProvider({
     uploadDraft,
     saveUploadDraft: setUploadDraft,
     clearUploadDraft: () => setUploadDraft(null),
+    verificationApplication,
+    submitVerificationApplication: async (data) => {
+      const res = await submitVerificationApplicationFn({ data });
+      if (res?.application) {
+        setVerificationApplication(res.application);
+      }
+      return res.application;
+    },
     // review workflow
     approveRelease: async (releaseId: string, newReleaseDate?: string | undefined) => {
       try {
@@ -1426,19 +1745,10 @@ export function PluggProvider({
         if (!res.success) {
           throw new Error("Failed to process replacement audio");
         }
-        setTracks((prev) =>
-          prev.map((t) =>
-            t.id === trackId
-              ? {
-                  ...t,
-                  audioUrl,
-                  durationSeconds: durationSeconds || t.durationSeconds,
-                  audioProcessingStatus: "completed",
-                }
-              : t
-          )
-        );
-        toast.success("Corrected master audio processed and updated!");
+        const fresh = await getInitialData();
+        setReleases(fresh.releases);
+        setTracks(fresh.tracks);
+        toast.success("Replacement received. Processing and review are required before publication.");
         return res;
       } catch (err: any) {
         toast.error(err.message || "Failed to replace audio");

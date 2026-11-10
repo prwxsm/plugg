@@ -7,7 +7,8 @@ export interface StoredFileMetadata {
 
 export interface StorageProvider {
   saveFile(key: string, data: Buffer | Uint8Array, mimeType: string): Promise<string>;
-  getFile(key: string): Promise<{
+  headFile(key: string): Promise<StoredFileMetadata | null>;
+  getFile(key: string, options?: { start?: number; end?: number }): Promise<{
     stream: NodeJS.ReadableStream;
     size: number;
     mimeType: string;

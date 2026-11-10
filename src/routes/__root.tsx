@@ -81,7 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       return await getInitialData();
     } catch (err) {
       console.error("Failed to load initial data in root loader:", err);
-      return null;
+      throw new Error("Unable to load Plugg data. Please try again.");
     }
   },
   head: () => ({

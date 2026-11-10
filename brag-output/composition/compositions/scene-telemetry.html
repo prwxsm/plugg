@@ -1,0 +1,213 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: #0d0e14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 0 100px;
+    }
+
+    .telemetry-ambient {
+      position: absolute;
+      width: 1000px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, rgba(20, 23, 33, 0.4) 50%, transparent 80%);
+      pointer-events: none;
+    }
+
+    .telemetry-header {
+      text-align: center;
+      margin-bottom: 50px;
+      z-index: 2;
+    }
+
+    .telemetry-eyebrow {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #9da4b4;
+      margin-bottom: 14px;
+    }
+
+    .telemetry-headline {
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+      line-height: 1.1;
+      text-transform: uppercase;
+    }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      width: 100%;
+      max-width: 1500px;
+      z-index: 2;
+    }
+
+    .stat-card {
+      background: rgba(22, 24, 34, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 44px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    }
+
+    .stat-number {
+      font-size: 58px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .stat-label {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #b0b8c8;
+      margin-bottom: 20px;
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 13px;
+      font-weight: 600;
+      color: #9da4b4;
+      align-self: flex-start;
+    }
+
+    .stat-pill-green {
+      color: #34d399;
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+
+    .verified-badge-large {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      margin-bottom: 18px;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-telemetry" data-width="1920" data-height="1080">
+    <div id="telemetry-glow-bg" class="clip telemetry-ambient" data-start="0" data-duration="5.5"></div>
+
+    <div id="telemetry-header-block" class="clip telemetry-header" data-start="0" data-duration="5.5">
+      <div class="telemetry-eyebrow" data-layout-ignore>Independent Artist Distribution</div>
+      <h2 class="telemetry-headline">Direct to Fans. Zero Middlemen.</h2>
+    </div>
+
+    <div id="telemetry-grid-block" class="clip telemetry-grid" data-start="0" data-duration="5.5">
+      <!-- Card 1: Streams -->
+      <div id="stat-card-1" class="stat-card">
+        <div class="stat-number">8,420,330</div>
+        <div class="stat-label">Total Streams</div>
+        <div class="stat-pill stat-pill-green" data-layout-ignore>
+          <span data-layout-ignore>↑ 36% Growth MoM • Uganda</span>
+        </div>
+      </div>
+
+      <!-- Card 2: Listeners -->
+      <div id="stat-card-2" class="stat-card">
+        <div class="stat-number">312,480</div>
+        <div class="stat-label">Monthly Listeners</div>
+        <div class="stat-pill" data-layout-ignore>
+          <span data-layout-ignore>Nebbi • Westnile & Global</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Verified Creator -->
+      <div id="stat-card-3" class="stat-card">
+        <img class="verified-badge-large" src="assets/images/badge.png" alt="Verified" />
+        <div class="stat-label" style="font-size: 22px; color: #ffffff; margin-bottom: 10px;">Verified Creator</div>
+        <div class="stat-pill" data-layout-ignore>
+          <span data-layout-ignore>Direct Royalty Payouts</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tlTelem = gsap.timeline({ paused: true });
+
+    // Header entrance
+    tlTelem.fromTo(
+      "#telemetry-header-block",
+      { opacity: 0, y: 30, filter: "blur(6px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.8, ease: "power3.out" },
+      0.3
+    );
+
+    // Card 1: stat 1
+    tlTelem.fromTo(
+      "#stat-card-1",
+      { opacity: 0, y: 40, scale: 0.94 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power4.out" },
+      1.43
+    );
+
+    // Card 2: stat 2
+    tlTelem.fromTo(
+      "#stat-card-2",
+      { opacity: 0, y: 40, scale: 0.94 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power4.out" },
+      2.52
+    );
+
+    // Card 3: stat 3
+    tlTelem.fromTo(
+      "#stat-card-3",
+      { opacity: 0, y: 40, scale: 0.94 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power4.out" },
+      3.61
+    );
+
+    // Scene exit transition
+    tlTelem.to(
+      ["#telemetry-header-block", "#telemetry-grid-block"],
+      { opacity: 0, scale: 0.96, duration: 0.45, ease: "power2.in" },
+      5.05
+    );
+
+    window.__timelines["scene-telemetry"] = tlTelem;
+    tlTelem.seek(0);
+  </script>
+</template>

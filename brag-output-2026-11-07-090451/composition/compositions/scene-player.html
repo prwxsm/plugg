@@ -1,0 +1,506 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1080px;
+      height: 1920px;
+      background: #0d0e14;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #fafafa;
+      padding: 60px 50px 40px;
+    }
+
+    .player-ambient-blur {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(32, 40, 60, 0.45) 45%, transparent 75%);
+      pointer-events: none;
+      filter: blur(40px);
+    }
+
+    /* Top mobile header */
+    .mobile-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+      margin-bottom: 30px;
+    }
+
+    .mobile-back-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-pill {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(22, 24, 34, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 12px 28px;
+      border-radius: 9999px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-pill img {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+
+    .brand-pill span {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+
+    .mobile-like-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+    }
+
+    /* Main artwork & info showcase */
+    .player-showcase {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      z-index: 5;
+    }
+
+    .artwork-container {
+      position: relative;
+      width: 640px;
+      height: 640px;
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85), 0 0 40px rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      margin-bottom: 40px;
+    }
+
+    .artwork-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .track-meta {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .track-title {
+      font-size: 72px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+      line-height: 1.1;
+    }
+
+    .artist-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .artist-name {
+      font-size: 42px;
+      font-weight: 700;
+      color: #fafafa;
+    }
+
+    .verified-icon {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+    }
+
+    .origin-label {
+      font-size: 30px;
+      font-weight: 600;
+      color: #b0b8c8;
+      letter-spacing: 0.04em;
+    }
+
+    /* Waveform & Scrubber Section */
+    .player-audio-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 0 40px;
+      z-index: 5;
+    }
+
+    .waveform-visualizer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 70px;
+      width: 100%;
+    }
+
+    .wave-bar {
+      width: 16px;
+      background: #ffffff;
+      border-radius: 9999px;
+      height: 16px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+    }
+
+    .scrubber-wrap {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .scrubber-track {
+      position: relative;
+      width: 100%;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 9999px;
+      overflow: visible;
+    }
+
+    .scrubber-progress {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 44%;
+      background: #ffffff;
+      border-radius: 9999px;
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.6);
+      transform-origin: left center;
+    }
+
+    .scrubber-thumb {
+      position: absolute;
+      top: 50%;
+      left: 44%;
+      transform: translate(-50%, -50%);
+      width: 28px;
+      height: 28px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.9);
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 28px;
+      font-weight: 600;
+      color: #b0b8c8;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Player Controls */
+    .controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      width: 100%;
+      margin: 20px 0;
+      z-index: 5;
+    }
+
+    .control-icon-btn {
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      opacity: 0.85;
+    }
+
+    .main-play-btn {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #0d0e14;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 15px 40px rgba(255, 255, 255, 0.35);
+    }
+
+    .tap-pulse-ring {
+      position: absolute;
+      inset: -15px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Mobile Bottom Navigation */
+    .mobile-bottom-nav {
+      width: 100%;
+      background: rgba(22, 24, 34, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 36px;
+      padding: 18px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(20px);
+      z-index: 10;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: #b0b8c8;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .nav-item.active {
+      color: #ffffff;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-player" data-width="1080" data-height="1920">
+    <div id="player-glow" class="clip player-ambient-blur" data-start="0" data-duration="5.0"></div>
+
+    <!-- Top Header -->
+    <div id="player-header-bar" class="mobile-header">
+      <div class="mobile-back-btn">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </div>
+
+      <div class="brand-pill" data-layout-ignore>
+        <img src="assets/images/logo.png" alt="Plugg" />
+        <span data-layout-ignore>plugg.</span>
+      </div>
+
+      <div class="mobile-like-btn">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="#ffffff" stroke="#ffffff" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
+      </div>
+    </div>
+
+    <!-- Center Showcase -->
+    <div id="player-showcase-box" class="player-showcase">
+      <div class="artwork-container">
+        <img src="assets/images/sonet.png" alt="Sonet" class="artwork-img" />
+      </div>
+
+      <div class="track-meta">
+        <h1 class="track-title">Forever</h1>
+        <div class="artist-row">
+          <span class="artist-name">Sonet</span>
+          <img src="assets/images/badge.png" alt="Verified" class="verified-icon" />
+        </div>
+        <p class="origin-label">Afrobeats • Nebbi, Westnile, Uganda</p>
+      </div>
+    </div>
+
+    <!-- Audio Scrubber & Waveform -->
+    <div id="player-audio-box" class="player-audio-section">
+      <div class="waveform-visualizer">
+        <div class="wave-bar wb-1"></div>
+        <div class="wave-bar wb-2"></div>
+        <div class="wave-bar wb-3"></div>
+        <div class="wave-bar wb-4"></div>
+        <div class="wave-bar wb-5"></div>
+        <div class="wave-bar wb-6"></div>
+        <div class="wave-bar wb-7"></div>
+        <div class="wave-bar wb-8"></div>
+        <div class="wave-bar wb-9"></div>
+        <div class="wave-bar wb-10"></div>
+        <div class="wave-bar wb-11"></div>
+        <div class="wave-bar wb-12"></div>
+        <div class="wave-bar wb-13"></div>
+        <div class="wave-bar wb-14"></div>
+        <div class="wave-bar wb-15"></div>
+        <div class="wave-bar wb-16"></div>
+      </div>
+
+      <div class="scrubber-wrap">
+        <div class="scrubber-track">
+          <div id="scrubber-fill" class="scrubber-progress"></div>
+          <div id="scrubber-dot" class="scrubber-thumb"></div>
+        </div>
+        <div class="time-row">
+          <span id="curr-time">1:24</span>
+          <span>3:42</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Row -->
+    <div id="player-controls-box" class="controls-row">
+      <div class="control-icon-btn">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m16 3 5 5-5 5"></path><path d="M4 20v-2a4 4 0 0 1 4-4h13"></path><path d="m16 11 5 5-5 5"></path><path d="M4 4v2a4 4 0 0 0 4 4h4"></path></svg>
+      </div>
+      <div class="control-icon-btn">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="3"></line></svg>
+      </div>
+
+      <!-- Play Button with interactive tap effect -->
+      <div id="btn-play-interactive" class="main-play-btn">
+        <div id="tap-ring" class="tap-pulse-ring"></div>
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+      </div>
+
+      <div class="control-icon-btn">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3"></line></svg>
+      </div>
+      <div class="control-icon-btn">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div id="mobile-nav-bar" class="mobile-bottom-nav">
+      <div class="nav-item active">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <span>Home</span>
+      </div>
+      <div class="nav-item">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span>Discover</span>
+      </div>
+      <div class="nav-item">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
+        <span>Library</span>
+      </div>
+      <div class="nav-item">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>Profile</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tlPlayer = gsap.timeline({ paused: true });
+
+    // Header bar entrance
+    tlPlayer.fromTo(
+      "#player-header-bar",
+      { opacity: 0, y: -20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" },
+      0
+    );
+
+    // Artwork & Track meta entrance
+    tlPlayer.fromTo(
+      "#player-showcase-box",
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" },
+      0.1
+    );
+
+    // Audio & Controls entrance
+    tlPlayer.fromTo(
+      ["#player-audio-box", "#player-controls-box", "#mobile-nav-bar"],
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.6, stagger: 0.1, ease: "power3.out" },
+      0.3
+    );
+
+    // Interactive Tap on Play Button at 1.2s local (= 5.4s film time)
+    tlPlayer.fromTo(
+      "#btn-play-interactive",
+      { scale: 1 },
+      { scale: 0.9, duration: 0.1, yoyo: true, repeat: 1, ease: "power2.inOut" },
+      1.2
+    );
+
+    tlPlayer.fromTo(
+      "#tap-ring",
+      { opacity: 0.9, scale: 1 },
+      { opacity: 0, scale: 1.6, duration: 0.45, ease: "power2.out" },
+      1.25
+    );
+
+    // Waveform dancing animation
+    const waveHeights = [55, 68, 38, 70, 60, 48, 65, 50, 68, 42, 60, 52, 65, 45, 58, 64];
+    const waveBars = document.querySelectorAll(".wave-bar");
+    waveBars.forEach((b, i) => {
+      tlPlayer.fromTo(
+        b,
+        { height: 16 },
+        {
+          height: waveHeights[i % waveHeights.length],
+          duration: 0.35,
+          repeat: 10,
+          yoyo: true,
+          ease: "power1.inOut"
+        },
+        0.5 + (i * 0.04)
+      );
+    });
+
+    // Scrubber forward progress using transform x and scaleX for sub-pixel smoothness
+    tlPlayer.fromTo(
+      "#scrubber-fill",
+      { scaleX: 1 },
+      { scaleX: 1.55, duration: 3.2, ease: "none" },
+      1.3
+    );
+    tlPlayer.fromTo(
+      "#scrubber-dot",
+      { x: 0 },
+      { x: 215, duration: 3.2, ease: "none" },
+      1.3
+    );
+
+    // Outro transition on elements rather than #root
+    tlPlayer.to(
+      ["#player-header-bar", "#player-showcase-box", "#player-audio-box", "#player-controls-box", "#mobile-nav-bar"],
+      { opacity: 0, y: -40, duration: 0.4, stagger: 0.05, ease: "power2.in" },
+      4.5
+    );
+
+    window.__timelines["scene-player"] = tlPlayer;
+    tlPlayer.seek(0);
+  </script>
+</template>
