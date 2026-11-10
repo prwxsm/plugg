@@ -7,6 +7,7 @@ import { Button, SectionHeader } from "@/components/plugg/primitives";
 import { AddToPlaylistButton } from "@/components/plugg/add-to-playlist-button";
 import { ShareModal } from "@/components/plugg/share-modal";
 import { art } from "@/data/covers";
+import { buildTrackHeadMeta, DEFAULT_PUBLIC_ORIGIN } from "@/lib/og-meta";
 import { formatCount, formatDuration, buildTrackDownloadFilename } from "@/lib/plugg";
 import { cn } from "@/lib/utils";
 import { getTrackShareData } from "@/server-fns/data-functions";
@@ -16,67 +17,21 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/track/$id")({
   loader: async ({ params }) => {
-    try {
-      const data = await getTrackShareData({ data: params.id });
-      if (!data) throw notFound();
-      return data;
-    } catch {
-      throw notFound();
-    }
+    const data = await getTrackShareData({ data: params.id });
+    if (!data) throw notFound();
+    return data;
   },
   head: ({ loaderData, params }) => {
-    if (!loaderData) {
-      return {
-        meta: [
-          { title: "Track not found — Plugg" },
-          { name: "robots", content: "noindex" },
-        ],
-      };
-    }
-
-    const title = `${loaderData.title} — ${loaderData.artistName}${loaderData.features ? ` (feat. ${loaderData.features})` : ""}`;
-    const description = `Stream "${loaderData.title}" by ${loaderData.artistName} on Plugg. High quality African music streaming.`;
-    
-    // Resolve absolute image URL for WhatsApp / social crawlers
-    const rawCover = art(loaderData.coverUrl);
-    const envUrl = typeof process !== "undefined" ? process.env["VITE_APP_URL"] : undefined;
-    const domain = envUrl ? envUrl.replace(/\/$/, "") : "https://plugg.app";
-    const imageUrl = rawCover.startsWith("http://") || rawCover.startsWith("https://")
-      ? rawCover
-      : `${domain}${rawCover.startsWith("/") ? "" : "/"}${rawCover}`;
-
-    const trackUrl = `${domain}/track/${params.id}`;
-
-    return {
-      meta: [
-        { title: `${title} | Plugg` },
-        { name: "description", content: description },
-
-        // Open Graph / WhatsApp
-        { property: "og:site_name", content: "Plugg" },
-        { property: "og:type", content: "music.song" },
-        { property: "og:title", content: title },
-        { property: "og:description", content: description },
-        { property: "og:image", content: imageUrl },
-        { property: "og:image:alt", content: title },
-        { property: "og:url", content: trackUrl },
-        { property: "music:duration", content: String(loaderData.durationSeconds || 0) },
-        { property: "music:musician", content: loaderData.artistName },
-
-        // Twitter Card
-        { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:title", content: title },
-        { name: "twitter:description", content: description },
-        { name: "twitter:image", content: imageUrl },
-      ],
-    };
+    const origin =
+      loaderData?.origin ||
+      (typeof window !== "undefined" ? window.location.origin : DEFAULT_PUBLIC_ORIGIN);
+    return buildTrackHeadMeta(loaderData, params.id, origin);
   },
   component: TrackPage,
 });
 
 function TrackPage() {
   const loaderData = Route.useLoaderData();
-  const { id } = Route.useParams();
   const {
     tracks,
     artists,
@@ -97,7 +52,7 @@ function TrackPage() {
   const [downloadOpen, setDownloadOpen] = useState(false);
 
   // Match hydrated client track or fallback to loaderData
-  const track = tracks.find((t) => t.id === id) || {
+  const track = tracks.find((t) => t.id === loaderData.id) || {
     id: loaderData.id,
     pluggTrackId: loaderData.pluggTrackId,
     artistId: loaderData.artistId,

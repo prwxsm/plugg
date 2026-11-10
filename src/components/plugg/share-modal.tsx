@@ -1,5 +1,7 @@
-import { X, Play, Pause, Share2 } from "lucide-react";
+import { useState } from "react";
+import { X, Play, Pause, Share2, Link2, Check } from "lucide-react";
 import { usePlugg } from "@/state/plugg-store";
+import { DEFAULT_PUBLIC_ORIGIN } from "@/lib/og-meta";
 import { formatDuration } from "@/lib/plugg";
 import { art } from "@/data/covers";
 import logoUrl from "@/assets/logo.png";
@@ -12,6 +14,7 @@ interface ShareModalProps {
 
 export function ShareModal({ trackId, onClose }: ShareModalProps) {
   const { tracks, artists, playTrack, togglePlay, currentTrack, isPlaying } = usePlugg();
+  const [copied, setCopied] = useState(false);
   const track = tracks.find((t) => t.id === trackId);
   const artist = artists.find((a) => a.id === track?.artistId);
 
@@ -20,16 +23,31 @@ export function ShareModal({ trackId, onClose }: ShareModalProps) {
   const isCurrent = currentTrack?.id === track.id;
   const isPlayingThis = isCurrent && isPlaying;
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://plugg.app";
-  const shareUrl = `${origin}/track/${track.id}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : DEFAULT_PUBLIC_ORIGIN;
+  const isSlugUnique =
+    Boolean(track.slug) && tracks.filter((t) => t.slug === track.slug).length === 1;
+  const sharePathSegment = isSlugUnique
+    ? track.slug
+    : track.pluggTrackId || track.id;
+  const shareUrl = `${origin}/track/${encodeURIComponent(sharePathSegment)}`;
   const shareTitle = `${track.title} — ${artist.displayName}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      toast.success("Stream link copied to clipboard!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy link automatically");
+    }
+  };
 
   const handleShare = async () => {
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({
           title: shareTitle,
-          text: `Stream "${track.title}" by ${artist.displayName} on Plugg`,
           url: shareUrl,
         });
         return;
@@ -39,9 +57,8 @@ export function ShareModal({ trackId, onClose }: ShareModalProps) {
         }
       }
     }
-    // Fallback on desktop without navigator.share
-    navigator.clipboard.writeText(shareUrl);
-    toast.success("Stream link copied to clipboard!");
+    // Fallback on desktop or when Web Share isn't available
+    await handleCopy();
   };
 
   return (
@@ -117,14 +134,23 @@ export function ShareModal({ trackId, onClose }: ShareModalProps) {
           </div>
         </div>
 
-        {/* Action Button: Share only */}
-        <div className="mt-4">
+        {/* Action Buttons: Share + Copy clean link */}
+        <div className="mt-4 flex items-center gap-2">
           <button
             onClick={handleShare}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-sm py-3 px-4 shadow-lg transition-all active:scale-[0.98]"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-sm py-3 px-4 shadow-lg transition-all active:scale-[0.98]"
           >
             <Share2 size={16} />
             <span>Share</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy link"
+            title="Copy clean link"
+            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white hover:bg-white/10 transition-colors active:scale-[0.98]"
+          >
+            {copied ? <Check size={16} className="text-emerald-400" /> : <Link2 size={16} />}
           </button>
         </div>
 

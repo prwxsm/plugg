@@ -39,16 +39,22 @@ export async function isStoredAudio(key: string) {
   return record?.["audio"] === true;
 }
 
+/** Returns true if a stored image key belongs to publicly visible user/artist/published artwork. */
+export async function isPublicStoredImage(key: string, connection: typeof sql = sql): Promise<boolean> {
+  if (!/\.(png|jpe?g|webp|gif)$/i.test(key)) return false;
+  const urls = ['/api/file/' + key, '/api/file/' + encodeURIComponent(key)];
+  const [publicImage] = await connection`SELECT
+    EXISTS(SELECT 1 FROM users WHERE avatar_url IN (${urls[0]!},${urls[1]!})) OR
+    EXISTS(SELECT 1 FROM artists WHERE avatar_url IN (${urls[0]!},${urls[1]!}) OR cover_url IN (${urls[0]!},${urls[1]!})) OR
+    EXISTS(SELECT 1 FROM releases WHERE cover_url IN (${urls[0]!},${urls[1]!}) AND status='published' AND NOT coalesce(rights_hold,false)) OR
+    EXISTS(SELECT 1 FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.cover_url IN (${urls[0]!},${urls[1]!}) AND t.published=true AND r.status='published' AND NOT coalesce(r.rights_hold,false)) AS allowed`;
+  return publicImage?.['allowed'] === true;
+}
+
 /** Only referenced public artwork is anonymous; documents and other uploads need an owner/staff session. */
 export async function canReadStoredFile(request: Request, key: string, connection: typeof sql = sql) {
+  if (await isPublicStoredImage(key, connection)) return true;
   const urls = ['/api/file/' + key, '/api/file/' + encodeURIComponent(key)];
-  if (/\.(png|jpe?g|webp|gif)$/i.test(key)) {
-    const [publicImage] = await connection`SELECT
-      EXISTS(SELECT 1 FROM users WHERE avatar_url IN (${urls[0]!},${urls[1]!})) OR
-      EXISTS(SELECT 1 FROM artists WHERE avatar_url IN (${urls[0]!},${urls[1]!}) OR cover_url IN (${urls[0]!},${urls[1]!})) OR
-      EXISTS(SELECT 1 FROM releases WHERE cover_url IN (${urls[0]!},${urls[1]!}) AND status='published' AND NOT coalesce(rights_hold,false)) AS allowed`;
-    if (publicImage?.['allowed']) return true;
-  }
   const cookie = request.headers.get('cookie')?.split(';').map(v => v.trim()).find(v => v.startsWith('plugg_session='))?.slice('plugg_session='.length);
   if (!cookie) return false;
   const [allowed] = await connection`SELECT EXISTS(

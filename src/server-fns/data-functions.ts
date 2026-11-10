@@ -22,10 +22,7 @@ import {
   normalizeIsrc,
 } from "@/lib/rights-validation";
 import { fallbackAnalytics } from "@/data/analytics";
-import { goLiveAt, todayISO } from "@/lib/plugg";
-import { tracks as seedTracks } from "@/data/tracks";
-import { artists as seedArtists } from "@/data/artists";
-import { releases as seedReleases } from "@/data/releases";
+import { goLiveAt } from "@/lib/plugg";
 
 export function parseSocialLinks(val: unknown): Record<string, string> {
   if (!val) return {};
@@ -909,9 +906,14 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
     const baseSlug =
       release.title
         .toLowerCase()
-        .replace(/[^a-z0-9]/g, "-")
-        .replace(/-+/g, "-") || "release";
-    const releaseSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "release";
+    let releaseSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const [dup] = await sql<{ id: string }[]>`SELECT id FROM releases WHERE slug = ${releaseSlug} LIMIT 1`;
+      if (!dup) break;
+      releaseSlug = `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
 
     const goLive = release.goLiveAt
       ? new Date(release.goLiveAt)
@@ -1057,9 +1059,14 @@ export const createReleaseWithTracksFn = createServerFn({ method: "POST" })
         const songBaseSlug =
           song.title
             .toLowerCase()
-            .replace(/[^a-z0-9]/g, "-")
-            .replace(/-+/g, "-") || "track";
-        const songSlug = `${songBaseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "track";
+        let songSlug = `${songBaseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const [dup] = await tx<{ id: string }[]>`SELECT id FROM tracks WHERE slug = ${songSlug} LIMIT 1`;
+          if (!dup) break;
+          songSlug = `${songBaseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
 
         // Generate Plugg Track ID using the sequence (concurrency-safe)
         const idRows = await tx<{ pluggTrackId: string }[]>`
@@ -1539,96 +1546,56 @@ export const upgradeToArtistFn = createServerFn({ method: "POST" })
 
 export const getTrackShareData = createServerFn({ method: "GET" })
   .validator((d: string) => d)
-  .handler(async ({ data: trackId }) => {
-    try {
-      const dbTracks = await sql<
-        {
-          id: string;
-          pluggTrackId: string;
-          artistId: string;
-          releaseId: string;
-          title: string;
-          slug: string;
-          genre: string;
-          coverUrl: string;
-          audioUrl: string | null;
-          durationSeconds: number;
-          playCount: string | number;
-          features: string | null;
-          producers: string | null;
-          lyrics: string | null;
-          artistName: string | null;
-          artistUsername: string | null;
-          artistAvatarUrl: string | null;
-          releaseTitle: string | null;
-          releaseSlug: string | null;
-        }[]
-      >`
-        SELECT t.id, t.plugg_track_id as "pluggTrackId", t.artist_id as "artistId", t.release_id as "releaseId", t.title, t.slug,
-               t.genre, t.cover_url as "coverUrl", t.audio_url as "audioUrl", t.duration_seconds as "durationSeconds",
-               t.play_count as "playCount", t.features, t.producers, t.lyrics,
-               a.display_name as "artistName", a.username as "artistUsername", a.avatar_url as "artistAvatarUrl",
-               r.title as "releaseTitle", r.slug as "releaseSlug"
-        FROM tracks t
-        LEFT JOIN artists a ON a.id = t.artist_id
-        LEFT JOIN releases r ON r.id = t.release_id
-        WHERE t.id = ${trackId}
-        LIMIT 1
-      `;
+  .handler(async ({ data: trackRef }) => {
+    const [{ getRequestHeaders, getRequestUrl }, { resolveRequestOrigin }, { fetchTrackShareRecord }] =
+      await Promise.all([
+        import("@tanstack/react-start/server"),
+        import("@/lib/og-meta"),
+        import("@/server/og-share-lookup"),
+      ]);
+    const record = await fetchTrackShareRecord(trackRef);
+    if (!record) return null;
+    const origin = resolveRequestOrigin(
+      getRequestHeaders(),
+      getRequestUrl({ xForwardedHost: true, xForwardedProto: true }),
+    );
+    return { ...record, origin };
+  });
 
-      if (dbTracks.length > 0) {
-        const row = dbTracks[0]!;
-        return {
-          id: row.id,
-          pluggTrackId: row.pluggTrackId || undefined,
-          artistId: row.artistId,
-          releaseId: row.releaseId,
-          title: row.title,
-          slug: row.slug,
-          genre: row.genre || "",
-          coverUrl: row.coverUrl || "",
-          audioUrl: row.audioUrl || null,
-          durationSeconds: Number(row.durationSeconds) || 0,
-          playCount: Number(row.playCount) || 0,
-          features: row.features || undefined,
-          producers: row.producers || undefined,
-          lyrics: row.lyrics || undefined,
-          artistName: row.artistName || "Artist",
-          artistUsername: row.artistUsername || "",
-          artistAvatarUrl: row.artistAvatarUrl || "",
-          releaseTitle: row.releaseTitle || "",
-          releaseSlug: row.releaseSlug || "",
-        };
-      }
-    } catch (e) {
-      console.error("Error looking up track from database:", e);
-    }
+export const getReleaseShareData = createServerFn({ method: "GET" })
+  .validator((d: string) => d)
+  .handler(async ({ data: releaseRef }) => {
+    const [{ getRequestHeaders, getRequestUrl }, { resolveRequestOrigin }, { fetchReleaseShareRecord }] =
+      await Promise.all([
+        import("@tanstack/react-start/server"),
+        import("@/lib/og-meta"),
+        import("@/server/og-share-lookup"),
+      ]);
+    const record = await fetchReleaseShareRecord(releaseRef);
+    if (!record) return null;
+    const origin = resolveRequestOrigin(
+      getRequestHeaders(),
+      getRequestUrl({ xForwardedHost: true, xForwardedProto: true }),
+    );
+    return { ...record, origin };
+  });
 
-    // Fallback to seed data
-    const seedTrack = seedTracks.find((t) => t.id === trackId);
-    if (!seedTrack) return null;
-    const seedArtist = seedArtists.find((a) => a.id === seedTrack.artistId);
-    const seedRelease = seedReleases.find((r) => r.id === seedTrack.releaseId);
-    return {
-      id: seedTrack.id,
-      artistId: seedTrack.artistId,
-      releaseId: seedTrack.releaseId,
-      title: seedTrack.title,
-      slug: seedTrack.slug,
-      genre: seedTrack.genre,
-      coverUrl: seedTrack.coverUrl,
-      audioUrl: seedTrack.audioUrl,
-      durationSeconds: seedTrack.durationSeconds,
-      playCount: seedTrack.playCount,
-      features: seedTrack.features,
-      producers: seedTrack.producers,
-      lyrics: seedTrack.lyrics,
-      artistName: seedArtist?.displayName ?? "Artist",
-      artistUsername: seedArtist?.username ?? "",
-      artistAvatarUrl: seedArtist?.avatarUrl ?? "",
-      releaseTitle: seedRelease?.title ?? "",
-      releaseSlug: seedRelease?.slug ?? "",
-    };
+export const getArtistShareData = createServerFn({ method: "GET" })
+  .validator((d: string) => d)
+  .handler(async ({ data: artistRef }) => {
+    const [{ getRequestHeaders, getRequestUrl }, { resolveRequestOrigin }, { fetchArtistShareRecord }] =
+      await Promise.all([
+        import("@tanstack/react-start/server"),
+        import("@/lib/og-meta"),
+        import("@/server/og-share-lookup"),
+      ]);
+    const record = await fetchArtistShareRecord(artistRef);
+    if (!record) return null;
+    const origin = resolveRequestOrigin(
+      getRequestHeaders(),
+      getRequestUrl({ xForwardedHost: true, xForwardedProto: true }),
+    );
+    return { ...record, origin };
   });
 
 export const submitVerificationApplicationFn = createServerFn({ method: "POST" })

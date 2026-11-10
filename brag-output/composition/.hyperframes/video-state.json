@@ -72,13 +72,13 @@
       "hash": "5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1",
       "content": "/home/prwxsm/.cache/hyperframes/history/5c6a2649-b69e-43e7-b97e-d4ab15e0de60/blobs/58/5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1"
     },
-    "assets/music/forever-by-sonet.mp3": {
-      "hash": "ad5bcc0c72edf7cb1e2b8e61b4930b14340c34f51bac00178e185b733c0830aa",
-      "content": "/home/prwxsm/.cache/hyperframes/history/5c6a2649-b69e-43e7-b97e-d4ab15e0de60/blobs/ad/ad5bcc0c72edf7cb1e2b8e61b4930b14340c34f51bac00178e185b733c0830aa"
-    },
     "assets/images/sonet.png": {
       "hash": "75e150238ffc0c789582e7c7aba31d587979919738ae1e58fcef08edab4c9929",
       "content": "/home/prwxsm/.cache/hyperframes/history/5c6a2649-b69e-43e7-b97e-d4ab15e0de60/blobs/75/75e150238ffc0c789582e7c7aba31d587979919738ae1e58fcef08edab4c9929"
+    },
+    "assets/music/forever-by-sonet.mp3": {
+      "hash": "ad5bcc0c72edf7cb1e2b8e61b4930b14340c34f51bac00178e185b733c0830aa",
+      "content": "/home/prwxsm/.cache/hyperframes/history/5c6a2649-b69e-43e7-b97e-d4ab15e0de60/blobs/ad/ad5bcc0c72edf7cb1e2b8e61b4930b14340c34f51bac00178e185b733c0830aa"
     },
     "assets/images/sonet-clean.png": {
       "hash": "6a3ffc8a2d434260155a5df00a591c143b100f5234a209c1137ab31170a3d4f0",
@@ -291,7 +291,7 @@
   "checks": {
     "latest": {
       "revision": "608dbd46-cb40-4e45-9eca-002a9f21e993",
-      "id": "f35297ee-2aa9-4b9c-83b7-1ca07334036c"
+      "id": "0b8b53f5-fdec-4474-b9de-8b2adc5fe5e6"
     },
     "revisions": {
       "79bd626a-bd1b-4e81-9397-4d88203deccf": [
@@ -375,6 +375,60 @@
             }
           },
           "createdAt": 1793618824685,
+          "contentHash": "135e6cfa031a5cfb1177ce1e13f8a49fd8103bacd9bf11156f6fea97cc37f262",
+          "revision": "608dbd46-cb40-4e45-9eca-002a9f21e993",
+          "inputFingerprint": "81444ce5b3614243f222feb6a27c3a93db6de3093e1872dbcadbb727e4f9305d",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        },
+        {
+          "id": "8b98f833-e674-49d5-8e9e-7ddad44ed03a",
+          "scope": "project",
+          "report": "/home/prwxsm/Projects/plugg/brag-output/composition/.hyperframes/artifacts/checks/8b98f833-e674-49d5-8e9e-7ddad44ed03a.json",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1794031084874,
+          "contentHash": "ebf4849e02cd5c3df68e00c2e886f5fe5a58fb6d8ed58f055e2922d5ec5e4011",
+          "revision": "608dbd46-cb40-4e45-9eca-002a9f21e993",
+          "inputFingerprint": "81444ce5b3614243f222feb6a27c3a93db6de3093e1872dbcadbb727e4f9305d",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        },
+        {
+          "id": "0b8b53f5-fdec-4474-b9de-8b2adc5fe5e6",
+          "scope": "project",
+          "report": "/home/prwxsm/Projects/plugg/brag-output/composition/.hyperframes/artifacts/checks/0b8b53f5-fdec-4474-b9de-8b2adc5fe5e6.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1794031536346,
           "contentHash": "135e6cfa031a5cfb1177ce1e13f8a49fd8103bacd9bf11156f6fea97cc37f262",
           "revision": "608dbd46-cb40-4e45-9eca-002a9f21e993",
           "inputFingerprint": "81444ce5b3614243f222feb6a27c3a93db6de3093e1872dbcadbb727e4f9305d",
